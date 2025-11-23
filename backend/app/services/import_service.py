@@ -464,6 +464,12 @@ class TXTImportService:
         success_count = 0
         error_count = 0
 
+        # Pre-load all stock codes that have concepts (performance optimization)
+        stocks_with_concepts = set(
+            sc.stock_code for sc in
+            self.db.query(StockConcept.stock_code).distinct().all()
+        )
+
         for line_num, line in enumerate(lines, 1):
             try:
                 line = line.strip()
@@ -489,6 +495,9 @@ class TXTImportService:
                 # Parse value
                 trade_value = int(float(trade_value_str))
 
+                # Check if stock has concepts (using pre-loaded set)
+                has_concept = stock_code in stocks_with_concepts
+
                 # Create raw data record
                 raw_data = StockMetricDataRaw(
                     import_batch_id=batch_id,
@@ -501,14 +510,17 @@ class TXTImportService:
                     trade_value=trade_value,
                     source_row_number=line_num,
                     raw_line=line,
-                    is_valid=True,
+                    is_valid=has_concept,  # 只有有概念的股票才标记为有效
                 )
                 self.db.add(raw_data)
 
                 # Ensure stock exists
                 self._ensure_stock(stock_code, exchange_prefix)
 
-                success_count += 1
+                if has_concept:
+                    success_count += 1
+                else:
+                    error_count += 1  # 没有概念的算作错误
 
                 # Batch commit
                 if success_count % 1000 == 0:
