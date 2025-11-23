@@ -1,0 +1,33 @@
+[Unit]
+Description=Stock Analysis API Server
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/stock-analysis/backend
+Environment="PATH=/opt/stock-analysis/backend/venv/bin"
+EnvironmentFile=/opt/stock-analysis/.env
+ExecStart=/opt/stock-analysis/backend/venv/bin/gunicorn app.main:app \
+    --workers 4 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 127.0.0.1:8000 \
+    --access-logfile /var/log/stock-analysis/access.log \
+    --error-logfile /var/log/stock-analysis/error.log \
+    --capture-output
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/stock-analysis/api.log
+StandardError=append:/var/log/stock-analysis/api-error.log
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/stock-analysis/uploads /var/log/stock-analysis
+
+[Install]
+WantedBy=multi-user.target

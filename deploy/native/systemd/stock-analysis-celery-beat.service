@@ -1,0 +1,26 @@
+[Unit]
+Description=Stock Analysis Celery Beat Scheduler
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/stock-analysis/backend
+Environment="PATH=/opt/stock-analysis/backend/venv/bin"
+EnvironmentFile=/opt/stock-analysis/.env
+ExecStart=/opt/stock-analysis/backend/venv/bin/celery \
+    -A tasks beat \
+    --loglevel=info
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/stock-analysis/celery-beat.log
+StandardError=append:/var/log/stock-analysis/celery-beat-error.log
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,207 @@
+"""Stock and concept schemas."""
+from datetime import date, datetime
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+# Stock schemas
+class StockBase(BaseModel):
+    """Base stock schema."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    exchange_prefix: Optional[str] = None
+
+
+class StockResponse(StockBase):
+    """Stock response schema."""
+
+    id: int
+    exchange_name: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StockListResponse(BaseModel):
+    """Stock list response."""
+
+    total: int
+    items: list[StockResponse]
+
+
+class StockWithConcepts(StockResponse):
+    """Stock with concepts."""
+
+    concepts: list["ConceptBrief"] = []
+
+
+# Concept schemas
+class ConceptBase(BaseModel):
+    """Base concept schema."""
+
+    concept_name: str
+    category: Optional[str] = None
+
+
+class ConceptResponse(ConceptBase):
+    """Concept response schema."""
+
+    id: int
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConceptBrief(BaseModel):
+    """Brief concept info."""
+
+    id: int
+    concept_name: str
+    category: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConceptListResponse(BaseModel):
+    """Concept list response."""
+
+    total: int
+    items: list[ConceptResponse]
+
+
+# Ranking schemas
+class RankingItem(BaseModel):
+    """Single ranking item."""
+
+    rank: int
+    stock_code: str
+    stock_name: Optional[str] = None
+    trade_value: int
+    percentile: Optional[float] = None
+
+
+class ConceptRankingResponse(BaseModel):
+    """Concept ranking response."""
+
+    concept_id: int
+    concept_name: str
+    trade_date: date
+    metric_code: str
+    total_stocks: int
+    rankings: list[RankingItem]
+
+
+class StockRankingHistory(BaseModel):
+    """Stock ranking history item."""
+
+    trade_date: date
+    rank: int
+    trade_value: int
+    total_stocks: int
+    percentile: Optional[float] = None
+
+
+class StockRankingHistoryResponse(BaseModel):
+    """Stock ranking history response."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    concept_id: int
+    concept_name: str
+    metric_code: str
+    history: list[StockRankingHistory]
+
+
+class TopNCountItem(BaseModel):
+    """Top N count item."""
+
+    concept_id: int
+    concept_name: str
+    top_n_count: int
+    top_n_rate: float
+
+
+class TopNCountResponse(BaseModel):
+    """Top N count response."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    date_range: dict
+    top_n: int
+    metric_code: str
+    trading_days: int
+    statistics: list[TopNCountItem]
+
+
+# Summary schemas
+class DailySummaryItem(BaseModel):
+    """Daily summary item."""
+
+    trade_date: date
+    total_value: int
+    avg_value: int
+    max_value: int
+    min_value: int
+    stock_count: int
+    median_value: Optional[int] = None
+    top10_sum: Optional[int] = None
+
+
+class ConceptSummaryResponse(BaseModel):
+    """Concept summary response."""
+
+    concept_id: int
+    concept_name: str
+    metric_code: str
+    summaries: list[DailySummaryItem]
+
+
+# Metric schemas
+class MetricTypeResponse(BaseModel):
+    """Metric type response."""
+
+    id: int
+    code: str
+    name: str
+    file_pattern: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# Import schemas
+class ImportBatchResponse(BaseModel):
+    """Import batch response."""
+
+    id: int
+    file_name: str
+    file_type: str
+    metric_code: Optional[str] = None
+    data_date: Optional[date] = None
+    status: str
+    compute_status: str
+    total_rows: int
+    success_rows: int
+    error_rows: int
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ImportUploadResponse(BaseModel):
+    """Import upload response."""
+
+    batch_id: int
+    file_name: str
+    status: str
+    message: str
