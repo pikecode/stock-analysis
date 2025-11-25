@@ -11,8 +11,9 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.stock import ImportBatch, MetricType
-from app.services.import_service import ImportService, CSVImportService, TXTImportService
-from app.services.compute_service import ComputeService
+from app.services.import_service import ImportService
+from app.services.optimized_csv_import import OptimizedCSVImportService
+from app.services.optimized_txt_import import OptimizedTXTImportService
 from app.schemas.stock import ImportBatchResponse, ImportUploadResponse
 
 router = APIRouter(prefix="/import", tags=["Import"])
@@ -117,9 +118,9 @@ async def upload_file(
         # Process synchronously
         try:
             if file_type == "CSV":
-                csv_service = CSVImportService(db)
                 import_service.update_batch_status(batch.id, "processing")
-                success, errors = csv_service.parse_and_import(batch.id, file_content)
+                csv_service = OptimizedCSVImportService(db)
+                success, errors = csv_service.parse_and_import_optimized(batch.id, file_content)
                 import_service.update_batch_status(
                     batch.id, "completed",
                     total_rows=success + errors,
@@ -127,17 +128,16 @@ async def upload_file(
                     error_rows=errors,
                 )
             else:
-                txt_service = TXTImportService(db)
-                compute_service = ComputeService(db)
-
                 import_service.update_batch_status(batch.id, "processing")
                 metric_type = import_service.get_metric_type_by_id(metric_type_id)
 
                 # Delete old data for the same metric type and date
                 import_service.delete_old_metric_data(metric_type_id, parsed_date, batch.id)
 
-                success, errors = txt_service.parse_and_import(
-                    batch.id, file_content, metric_type, parsed_date
+                # Use optimized TXT import service (includes computation)
+                txt_service = OptimizedTXTImportService(db)
+                success, errors = txt_service.parse_and_import_with_compute(
+                    batch.id, file_content, metric_type_id, metric_type.code, parsed_date
                 )
                 import_service.update_batch_status(
                     batch.id, "completed",
@@ -145,9 +145,6 @@ async def upload_file(
                     success_rows=success,
                     error_rows=errors,
                 )
-
-                # Compute rankings and summaries
-                compute_service.compute_all_for_batch(batch.id)
 
             # Clean up file
             if os.path.exists(file_path):

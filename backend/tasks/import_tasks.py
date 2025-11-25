@@ -4,17 +4,17 @@ from datetime import date
 
 from tasks.celery_app import celery_app
 from app.core.database import SessionLocal
-from app.services.import_service import ImportService, CSVImportService, TXTImportService
-from app.services.compute_service import ComputeService
+from app.services.import_service import ImportService
+from app.services.optimized_csv_import import OptimizedCSVImportService
+from app.services.optimized_txt_import import OptimizedTXTImportService
 
 
 @celery_app.task(bind=True, name="tasks.process_csv_import")
 def process_csv_import(self, batch_id: int, file_path: str):
-    """Process CSV file import."""
+    """Process CSV file import (async)."""
     db = SessionLocal()
     try:
         import_service = ImportService(db)
-        csv_service = CSVImportService(db)
 
         # Update status
         import_service.update_batch_status(batch_id, "processing")
@@ -23,8 +23,9 @@ def process_csv_import(self, batch_id: int, file_path: str):
         with open(file_path, "rb") as f:
             file_content = f.read()
 
-        # Parse and import
-        success_count, error_count = csv_service.parse_and_import(batch_id, file_content)
+        # Parse and import using optimized service
+        csv_service = OptimizedCSVImportService(db)
+        success_count, error_count = csv_service.parse_and_import_optimized(batch_id, file_content)
 
         # Update status
         import_service.update_batch_status(
@@ -62,12 +63,10 @@ def process_txt_import(
     metric_type_id: int,
     data_date_str: str,
 ):
-    """Process TXT file import."""
+    """Process TXT file import (async) - includes computation."""
     db = SessionLocal()
     try:
         import_service = ImportService(db)
-        txt_service = TXTImportService(db)
-        compute_service = ComputeService(db)
 
         # Update status
         import_service.update_batch_status(batch_id, "processing")
@@ -87,9 +86,10 @@ def process_txt_import(
         with open(file_path, "rb") as f:
             file_content = f.read()
 
-        # Parse and import
-        success_count, error_count = txt_service.parse_and_import(
-            batch_id, file_content, metric_type, data_date
+        # Parse and import using optimized service (includes computation)
+        txt_service = OptimizedTXTImportService(db)
+        success_count, error_count = txt_service.parse_and_import_with_compute(
+            batch_id, file_content, metric_type_id, metric_type.code, data_date
         )
 
         # Update status
@@ -100,10 +100,6 @@ def process_txt_import(
             success_rows=success_count,
             error_rows=error_count,
         )
-
-        # Trigger computation
-        import_service.update_compute_status(batch_id, "computing")
-        compute_service.compute_all_for_batch(batch_id)
 
         # Clean up file
         if os.path.exists(file_path):
