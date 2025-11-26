@@ -9,6 +9,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
   const isAdmin = computed(() => user.value?.roles.includes('admin') ?? false)
+  const isCustomer = computed(() => user.value?.roles.includes('customer') ?? false)
+  const roles = computed(() => user.value?.roles ?? [])
+  const permissions = computed(() => user.value?.permissions ?? [])
 
   async function login(credentials: LoginRequest) {
     loading.value = true
@@ -46,13 +49,52 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 检查是否拥有指定的角色
+  function hasRole(role: string): boolean {
+    return roles.value.includes(role)
+  }
+
+  // 检查是否拥有指定的权限
+  function hasPermission(permission: string): boolean {
+    return permissions.value.includes(permission)
+  }
+
+  // 检查是否拥有所有指定的角色
+  function hasAllRoles(roleList: string[]): boolean {
+    return roleList.every(role => roles.value.includes(role))
+  }
+
+  // 检查是否拥有任意一个指定的角色
+  function hasAnyRole(roleList: string[]): boolean {
+    return roleList.some(role => roles.value.includes(role))
+  }
+
+  // 检查是否拥有所有指定的权限
+  function hasAllPermissions(permissionList: string[]): boolean {
+    return permissionList.every(perm => permissions.value.includes(perm))
+  }
+
+  // 检查是否拥有任意一个指定的权限
+  function hasAnyPermission(permissionList: string[]): boolean {
+    return permissionList.some(perm => permissions.value.includes(perm))
+  }
+
   return {
     user,
     loading,
     isLoggedIn,
     isAdmin,
+    isCustomer,
+    roles,
+    permissions,
     login,
     logout,
     fetchUser,
+    hasRole,
+    hasPermission,
+    hasAllRoles,
+    hasAnyRole,
+    hasAllPermissions,
+    hasAnyPermission,
   }
 })

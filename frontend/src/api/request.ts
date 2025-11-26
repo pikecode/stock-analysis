@@ -64,7 +64,7 @@ request.interceptors.response.use(
           break
 
         case 403:
-          ElMessage.error('Permission denied')
+          ElMessage.error(data.detail || '您没有权限访问此功能')
           break
 
         case 404:

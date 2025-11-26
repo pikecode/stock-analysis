@@ -21,6 +21,8 @@ from app.schemas.stock import (
     StockRankingHistory,
     TopNCountResponse,
     TopNCountItem,
+    ConceptStocksRankingRangeResponse,
+    StockRankingInRangeItem,
 )
 
 router = APIRouter(prefix="/rankings", tags=["Rankings"])
@@ -223,3 +225,161 @@ async def get_top_n_count(
         trading_days=trading_days,
         statistics=statistics,
     )
+
+
+@router.get("/concept/{concept_id}/stocks-in-range", response_model=ConceptStocksRankingRangeResponse)
+async def get_concept_stocks_in_date_range(
+    concept_id: int,
+    start_date: date = Query(..., description="Start date"),
+    end_date: date = Query(..., description="End date"),
+    metric_code: str = Query("TTV", description="Metric code"),
+    limit: int = Query(100, ge=1, le=500, description="Number of results"),
+    use_latest_date: bool = Query(True, description="Use latest date in range if True"),
+    db: Session = Depends(get_db),
+):
+    """Get stocks ranking in a concept within a date range.
+
+    Args:
+        concept_id: Concept ID
+        start_date: Start date of the range
+        end_date: End date of the range
+        metric_code: Metric code (e.g., TTV, EEE)
+        limit: Max number of stocks to return
+        use_latest_date: If True, returns ranking for the latest date in range.
+                        If False, returns for each date in range.
+
+    Returns:
+        Stocks ranking in the concept within date range, sorted by trade_value (high to low)
+    """
+    # Verify concept exists
+    concept = db.query(Concept).filter(Concept.id == concept_id).first()
+    if not concept:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Concept {concept_id} not found",
+        )
+
+    if use_latest_date:
+        # Find latest date in range
+        latest_date = (
+            db.query(func.max(ConceptStockDailyRank.trade_date))
+            .filter(
+                ConceptStockDailyRank.concept_id == concept_id,
+                ConceptStockDailyRank.metric_code == metric_code,
+                ConceptStockDailyRank.trade_date >= start_date,
+                ConceptStockDailyRank.trade_date <= end_date,
+            )
+            .scalar()
+        )
+
+        if not latest_date:
+            return ConceptStocksRankingRangeResponse(
+                concept_id=concept_id,
+                concept_name=concept.concept_name,
+                metric_code=metric_code,
+                start_date=start_date,
+                end_date=end_date,
+                query_date=None,
+                total_stocks=0,
+                stocks=[],
+            )
+
+        # Get rankings for latest date
+        rankings = (
+            db.query(ConceptStockDailyRank)
+            .filter(
+                ConceptStockDailyRank.concept_id == concept_id,
+                ConceptStockDailyRank.trade_date == latest_date,
+                ConceptStockDailyRank.metric_code == metric_code,
+            )
+            .order_by(ConceptStockDailyRank.trade_value.desc())
+            .limit(limit)
+            .all()
+        )
+
+        # Get stock names
+        stock_codes = [r.stock_code for r in rankings]
+        stocks = db.query(Stock).filter(Stock.stock_code.in_(stock_codes)).all()
+        stock_map = {s.stock_code: s.stock_name for s in stocks}
+
+        return ConceptStocksRankingRangeResponse(
+            concept_id=concept_id,
+            concept_name=concept.concept_name,
+            metric_code=metric_code,
+            start_date=start_date,
+            end_date=end_date,
+            query_date=latest_date,
+            total_stocks=len(rankings),
+            stocks=[
+                StockRankingInRangeItem(
+                    stock_code=r.stock_code,
+                    stock_name=stock_map.get(r.stock_code),
+                    rank=r.rank,
+                    trade_value=r.trade_value,
+                    percentile=float(r.percentile) if r.percentile else None,
+                    trade_date=r.trade_date,
+                )
+                for r in rankings
+            ],
+        )
+    else:
+        # Get all rankings in date range, grouped by stock and aggregated
+        # This returns average rank and total trade_value for each stock in the range
+        rankings = (
+            db.query(
+                ConceptStockDailyRank.stock_code,
+                func.avg(ConceptStockDailyRank.trade_value).label("avg_trade_value"),
+                func.max(ConceptStockDailyRank.trade_value).label("max_trade_value"),
+                func.min(ConceptStockDailyRank.rank).label("best_rank"),
+                func.avg(ConceptStockDailyRank.rank).label("avg_rank"),
+                func.count(func.distinct(ConceptStockDailyRank.trade_date)).label("trading_days"),
+            )
+            .filter(
+                ConceptStockDailyRank.concept_id == concept_id,
+                ConceptStockDailyRank.metric_code == metric_code,
+                ConceptStockDailyRank.trade_date >= start_date,
+                ConceptStockDailyRank.trade_date <= end_date,
+            )
+            .group_by(ConceptStockDailyRank.stock_code)
+            .order_by(func.avg(ConceptStockDailyRank.trade_value).desc())
+            .limit(limit)
+            .all()
+        )
+
+        if not rankings:
+            return ConceptStocksRankingRangeResponse(
+                concept_id=concept_id,
+                concept_name=concept.concept_name,
+                metric_code=metric_code,
+                start_date=start_date,
+                end_date=end_date,
+                query_date=None,
+                total_stocks=0,
+                stocks=[],
+            )
+
+        # Get stock names
+        stock_codes = [r[0] for r in rankings]
+        stocks = db.query(Stock).filter(Stock.stock_code.in_(stock_codes)).all()
+        stock_map = {s.stock_code: s.stock_name for s in stocks}
+
+        return ConceptStocksRankingRangeResponse(
+            concept_id=concept_id,
+            concept_name=concept.concept_name,
+            metric_code=metric_code,
+            start_date=start_date,
+            end_date=end_date,
+            query_date=None,
+            total_stocks=len(rankings),
+            stocks=[
+                StockRankingInRangeItem(
+                    stock_code=r[0],
+                    stock_name=stock_map.get(r[0]),
+                    rank=int(r[3]) if r[3] else None,  # best_rank
+                    trade_value=int(r[1]) if r[1] else 0,  # avg_trade_value
+                    percentile=None,
+                    trade_date=None,
+                )
+                for r in rankings
+            ],
+        )

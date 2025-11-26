@@ -2,11 +2,18 @@
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings."""
+
+    model_config = ConfigDict(
+        extra='ignore',
+        env_file='.env',
+        case_sensitive=True
+    )
 
     # App
     APP_NAME: str = "Stock Analysis API"
@@ -25,8 +32,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS - comma separated string (stored internally)
+    _cors_origins_str: str = "http://localhost:3000,http://localhost:5173"
     ALLOWED_HOSTS: str = "*"
 
     # File Upload
@@ -37,9 +44,20 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    @property
+    def CORS_ORIGINS(self) -> list[str]:
+        """Get CORS origins as a list."""
+        origins = getattr(self, '_cors_origins_str', "http://localhost:3000,http://localhost:5173")
+        # If it comes from env with name CORS_ORIGINS, try to parse it
+        if hasattr(self, '__dict__') and 'CORS_ORIGINS' in self.__dict__:
+            origins = self.__dict__['CORS_ORIGINS']
+        return [o.strip() for o in origins.split(",") if o.strip()]
+
+    def __init__(self, **data):
+        # Handle CORS_ORIGINS from env
+        if 'CORS_ORIGINS' in data:
+            data['_cors_origins_str'] = data.pop('CORS_ORIGINS')
+        super().__init__(**data)
 
 
 @lru_cache

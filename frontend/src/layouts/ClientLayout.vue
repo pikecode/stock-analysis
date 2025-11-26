@@ -6,10 +6,10 @@ import {
   Document,
   Folder,
   TrendCharts,
-  Upload,
-  List,
+  DataAnalysis,
   User,
   SwitchButton,
+  Setting,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -18,11 +18,9 @@ const authStore = useAuthStore()
 
 const activeMenu = computed(() => {
   const path = route.path
-  if (path.startsWith('/stocks')) return '/stocks'
-  if (path.startsWith('/concepts')) return '/concepts'
-  if (path.startsWith('/rankings')) return '/rankings'
-  if (path.startsWith('/import')) return '/import'
-  if (path.startsWith('/reports')) return '/reports'
+  if (path.startsWith('/reports')) return path
+  if (path.startsWith('/analysis')) return path
+  if (path.startsWith('/profile')) return path
   return path
 })
 
@@ -34,9 +32,10 @@ const handleLogout = async () => {
 
 <template>
   <el-container class="layout-container">
+    <!-- 客户端专用侧边栏 -->
     <el-aside width="200px" class="sidebar">
       <div class="logo">
-        <h2>Stock Analysis</h2>
+        <h2>📈 数据分析</h2>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -45,38 +44,46 @@ const handleLogout = async () => {
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
-        <el-menu-item index="/stocks">
-          <el-icon><Document /></el-icon>
-          <span>股票列表</span>
-        </el-menu-item>
-        <el-menu-item index="/concepts">
-          <el-icon><Folder /></el-icon>
-          <span>概念列表</span>
-        </el-menu-item>
-        <el-menu-item index="/rankings">
-          <el-icon><TrendCharts /></el-icon>
-          <span>排名查询</span>
-        </el-menu-item>
-
-        <!-- 管理员菜单 - 仅 Admin 可见 -->
-        <el-sub-menu v-if="authStore.isAdmin" index="/import">
+        <!-- 报表分析 -->
+        <el-sub-menu index="/reports">
           <template #title>
-            <el-icon><Upload /></el-icon>
-            <span>数据导入</span>
+            <el-icon><DataAnalysis /></el-icon>
+            <span>报表分析</span>
           </template>
-          <el-menu-item index="/import">上传文件</el-menu-item>
-          <el-menu-item index="/import/batches">
-            <el-icon><List /></el-icon>
-            导入记录
-          </el-menu-item>
+          <el-menu-item index="/reports">报表总览</el-menu-item>
+          <el-menu-item index="/reports/concept-ranking">概念排名</el-menu-item>
+          <el-menu-item index="/reports/stock-trend">股票趋势</el-menu-item>
+          <el-menu-item index="/reports/top-n">Top N 分析</el-menu-item>
         </el-sub-menu>
 
-        <!-- 普通用户菜单 - 仅 Customer 可见（占位符，后续添加报表） -->
-        <!-- 报表菜单将在后续添加 -->
+        <!-- 数据分析 -->
+        <el-sub-menu index="/analysis">
+          <template #title>
+            <el-icon><TrendCharts /></el-icon>
+            <span>数据分析</span>
+          </template>
+          <el-menu-item index="/analysis/portfolio">投资组合</el-menu-item>
+          <el-menu-item index="/analysis/performance">业绩分析</el-menu-item>
+        </el-sub-menu>
+
+        <!-- 个人中心 -->
+        <el-sub-menu index="/profile">
+          <template #title>
+            <el-icon><User /></el-icon>
+            <span>个人中心</span>
+          </template>
+          <el-menu-item index="/profile">用户信息</el-menu-item>
+          <el-menu-item index="/profile/settings">账户设置</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
+
     <el-container>
+      <!-- 顶部栏 -->
       <el-header class="header">
+        <div class="header-left">
+          <span class="title">库存分析系统 - 客户端</span>
+        </div>
         <div class="header-right">
           <el-dropdown @command="handleLogout">
             <span class="user-info">
@@ -94,6 +101,8 @@ const handleLogout = async () => {
           </el-dropdown>
         </div>
       </el-header>
+
+      <!-- 主内容区 -->
       <el-main class="main-content">
         <router-view />
       </el-main>
@@ -117,6 +126,7 @@ const handleLogout = async () => {
   align-items: center;
   justify-content: center;
   background-color: #263445;
+  border-bottom: 1px solid #1f2a3a;
 }
 
 .logo h2 {
@@ -130,8 +140,19 @@ const handleLogout = async () => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 20px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
 }
 
 .header-right {

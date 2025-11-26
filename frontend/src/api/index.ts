@@ -128,3 +128,55 @@ export const importApi = {
     return request.get<any, MetricType[]>('/import/metrics')
   },
 }
+
+// Report API
+export const reportApi = {
+  // Get stocks ranked in a concept within date range
+  getConceptStocksInRange(
+    conceptId: number,
+    params: {
+      start_date: string
+      end_date: string
+      metric_code?: string
+      limit?: number
+      use_latest_date?: boolean
+    }
+  ) {
+    return request.get<any, any>(`/rankings/concept/${conceptId}/stocks-in-range`, { params })
+  },
+
+  // Get stock concepts ranked by value
+  getStockConceptsRanked(
+    stockCode: string,
+    params: { trade_date: string; metric_code?: string }
+  ) {
+    return request.get<any, any>(`/stocks/${stockCode}/concepts-ranked`, { params })
+  },
+
+  // Get stock ranking history in a concept
+  getStockRankingHistory(
+    stockCode: string,
+    params: {
+      concept_id: number
+      start_date: string
+      end_date: string
+      metric_code?: string
+    }
+  ) {
+    return request.get<any, any>(`/rankings/stock/${stockCode}`, { params })
+  },
+
+  // Get times stock appeared in top N
+  getTopNCount(
+    stockCode: string,
+    params: {
+      start_date: string
+      end_date: string
+      top_n?: number
+      concept_id?: number
+      metric_code?: string
+    }
+  ) {
+    return request.get<any, any>(`/rankings/stock/${stockCode}/top-n-count`, { params })
+  },
+}

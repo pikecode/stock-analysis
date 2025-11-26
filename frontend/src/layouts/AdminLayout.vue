@@ -10,6 +10,7 @@ import {
   List,
   User,
   SwitchButton,
+  Setting,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -18,11 +19,11 @@ const authStore = useAuthStore()
 
 const activeMenu = computed(() => {
   const path = route.path
-  if (path.startsWith('/stocks')) return '/stocks'
-  if (path.startsWith('/concepts')) return '/concepts'
-  if (path.startsWith('/rankings')) return '/rankings'
-  if (path.startsWith('/import')) return '/import'
-  if (path.startsWith('/reports')) return '/reports'
+  if (path.startsWith('/admin/stocks')) return '/admin/stocks'
+  if (path.startsWith('/admin/concepts')) return '/admin/concepts'
+  if (path.startsWith('/admin/rankings')) return '/admin/rankings'
+  if (path.startsWith('/admin/import')) return '/admin/import'
+  if (path.startsWith('/admin/settings')) return '/admin/settings'
   return path
 })
 
@@ -34,9 +35,10 @@ const handleLogout = async () => {
 
 <template>
   <el-container class="layout-container">
+    <!-- 管理员专用侧边栏 -->
     <el-aside width="200px" class="sidebar">
       <div class="logo">
-        <h2>Stock Analysis</h2>
+        <h2>📊 管理后台</h2>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -45,43 +47,52 @@ const handleLogout = async () => {
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
-        <el-menu-item index="/stocks">
+        <!-- 数据管理 -->
+        <el-menu-item index="/admin/stocks">
           <el-icon><Document /></el-icon>
-          <span>股票列表</span>
+          <span>股票管理</span>
         </el-menu-item>
-        <el-menu-item index="/concepts">
+        <el-menu-item index="/admin/concepts">
           <el-icon><Folder /></el-icon>
-          <span>概念列表</span>
+          <span>概念管理</span>
         </el-menu-item>
-        <el-menu-item index="/rankings">
+        <el-menu-item index="/admin/rankings">
           <el-icon><TrendCharts /></el-icon>
           <span>排名查询</span>
         </el-menu-item>
 
-        <!-- 管理员菜单 - 仅 Admin 可见 -->
-        <el-sub-menu v-if="authStore.isAdmin" index="/import">
+        <!-- 数据导入 - Admin 专用 -->
+        <el-sub-menu index="/admin/import">
           <template #title>
             <el-icon><Upload /></el-icon>
-            <span>数据导入</span>
+            <span>📥 数据导入</span>
           </template>
-          <el-menu-item index="/import">上传文件</el-menu-item>
-          <el-menu-item index="/import/batches">
+          <el-menu-item index="/admin/import">上传文件</el-menu-item>
+          <el-menu-item index="/admin/import/batches">
             <el-icon><List /></el-icon>
             导入记录
           </el-menu-item>
         </el-sub-menu>
 
-        <!-- 普通用户菜单 - 仅 Customer 可见（占位符，后续添加报表） -->
-        <!-- 报表菜单将在后续添加 -->
+        <!-- 系统设置 -->
+        <el-menu-item index="/admin/settings">
+          <el-icon><Setting /></el-icon>
+          <span>系统设置</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
+
     <el-container>
+      <!-- 顶部栏 -->
       <el-header class="header">
+        <div class="header-left">
+          <span class="title">库存分析系统 - 管理员</span>
+        </div>
         <div class="header-right">
           <el-dropdown @command="handleLogout">
             <span class="user-info">
               <el-icon><User /></el-icon>
-              {{ authStore.user?.username || '用户' }}
+              {{ authStore.user?.username || '管理员' }}
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -94,6 +105,8 @@ const handleLogout = async () => {
           </el-dropdown>
         </div>
       </el-header>
+
+      <!-- 主内容区 -->
       <el-main class="main-content">
         <router-view />
       </el-main>
@@ -117,6 +130,7 @@ const handleLogout = async () => {
   align-items: center;
   justify-content: center;
   background-color: #263445;
+  border-bottom: 1px solid #1f2a3a;
 }
 
 .logo h2 {
@@ -130,8 +144,19 @@ const handleLogout = async () => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 20px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
 }
 
 .header-right {

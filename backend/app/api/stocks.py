@@ -1,16 +1,19 @@
 """Stocks API."""
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.stock import Stock, Concept, StockConcept
+from app.models.stock import Stock, Concept, StockConcept, ConceptStockDailyRank
 from app.schemas.stock import (
     StockResponse,
     StockListResponse,
     StockWithConcepts,
     ConceptBrief,
+    StockConceptsRankedResponse,
+    ConceptRankedItem,
 )
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
@@ -127,3 +130,80 @@ async def get_stock_concepts(stock_code: str, db: Session = Depends(get_db)):
             for c in concepts
         ],
     }
+
+
+@router.get("/{stock_code}/concepts-ranked", response_model=StockConceptsRankedResponse)
+async def get_stock_concepts_ranked(
+    stock_code: str,
+    trade_date: date = Query(..., description="Trade date (YYYY-MM-DD)"),
+    metric_code: str = Query("TTV", description="Metric code (e.g., TTV, EEE)"),
+    db: Session = Depends(get_db),
+):
+    """Get concepts for a stock sorted by trade value (high to low).
+
+    Args:
+        stock_code: Stock code (e.g., '600000')
+        trade_date: Specific trade date to query
+        metric_code: Metric code (default: 'TTV')
+
+    Returns:
+        Stock info with all concepts sorted by trade_value descending
+    """
+    # Verify stock exists
+    stock = db.query(Stock).filter(Stock.stock_code == stock_code).first()
+
+    if not stock:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stock {stock_code} not found",
+        )
+
+    # Get stock concepts with ranking data
+    # Query: JOIN stock_concepts with ConceptStockDailyRank to get trade_value
+    results = (
+        db.query(
+            Concept.id,
+            Concept.concept_name,
+            Concept.category,
+            ConceptStockDailyRank.trade_value,
+            ConceptStockDailyRank.rank,
+            ConceptStockDailyRank.percentile,
+        )
+        .join(
+            StockConcept,
+            Concept.id == StockConcept.concept_id,
+        )
+        .outerjoin(
+            ConceptStockDailyRank,
+            (ConceptStockDailyRank.concept_id == Concept.id)
+            & (ConceptStockDailyRank.stock_code == stock_code)
+            & (ConceptStockDailyRank.trade_date == trade_date)
+            & (ConceptStockDailyRank.metric_code == metric_code),
+        )
+        .filter(StockConcept.stock_code == stock_code)
+        .order_by(ConceptStockDailyRank.trade_value.desc())
+        .all()
+    )
+
+    # Build response
+    concepts = [
+        ConceptRankedItem(
+            id=r[0],
+            concept_name=r[1],
+            category=r[2],
+            trade_value=r[3],
+            rank=r[4],
+            percentile=float(r[5]) if r[5] else None,
+        )
+        for r in results
+    ]
+
+    return StockConceptsRankedResponse(
+        stock_code=stock.stock_code,
+        stock_name=stock.stock_name,
+        exchange_prefix=stock.exchange_prefix,
+        trade_date=trade_date,
+        metric_code=metric_code,
+        total_concepts=len(concepts),
+        concepts=concepts,
+    )

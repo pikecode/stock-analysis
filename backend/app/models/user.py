@@ -68,6 +68,7 @@ class Permission(Base):
     __tablename__ = "permissions"
 
     id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(100), unique=True, nullable=False)
     name = Column(String(100), unique=True, nullable=False)
     resource = Column(String(50), nullable=False)
     action = Column(String(20), nullable=False)

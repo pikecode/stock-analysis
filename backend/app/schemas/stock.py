@@ -205,3 +205,52 @@ class ImportUploadResponse(BaseModel):
     file_name: str
     status: str
     message: str
+
+
+# Stock with ranked concepts schemas
+class ConceptRankedItem(BaseModel):
+    """Concept with ranking info."""
+
+    id: int
+    concept_name: str
+    category: Optional[str] = None
+    trade_value: Optional[int] = None
+    rank: Optional[int] = None
+    percentile: Optional[float] = None
+
+
+class StockConceptsRankedResponse(BaseModel):
+    """Stock with ranked concepts response."""
+
+    stock_code: str
+    stock_name: str
+    exchange_prefix: Optional[str] = None
+    trade_date: date
+    metric_code: str
+    total_concepts: int
+    concepts: list[ConceptRankedItem]
+
+
+# Concept stocks in date range schemas
+class StockRankingInRangeItem(BaseModel):
+    """Stock ranking in a concept within date range."""
+
+    stock_code: str
+    stock_name: Optional[str] = None
+    rank: int
+    trade_value: int
+    percentile: Optional[float] = None
+    trade_date: Optional[date] = None
+
+
+class ConceptStocksRankingRangeResponse(BaseModel):
+    """Concept stocks ranking in date range response."""
+
+    concept_id: int
+    concept_name: str
+    metric_code: str
+    start_date: date
+    end_date: date
+    query_date: Optional[date] = None  # 实际查询的日期（如果使用latest_date）
+    total_stocks: int
+    stocks: list[StockRankingInRangeItem]

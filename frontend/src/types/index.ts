@@ -7,6 +7,7 @@ export interface User {
   avatar_url?: string
   status: string
   roles: string[]
+  permissions: string[]
 }
 
 export interface LoginRequest {

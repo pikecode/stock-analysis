@@ -105,6 +105,13 @@ async def logout(current_user: User = Depends(get_current_user)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user info."""
+    # Get all permissions from user's roles
+    permissions = []
+    for role in current_user.roles:
+        for permission in role.permissions:
+            if permission.code not in permissions:
+                permissions.append(permission.code)
+
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
@@ -114,6 +121,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         status=current_user.status,
         created_at=current_user.created_at,
         roles=[role.name for role in current_user.roles],
+        permissions=permissions,
     )
 
 

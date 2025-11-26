@@ -32,7 +32,18 @@ const handleLogin = async () => {
     const success = await authStore.login(form)
     if (success) {
       ElMessage.success('登录成功')
-      const redirect = (route.query.redirect as string) || '/'
+
+      // 根据用户角色重定向
+      let redirect = (route.query.redirect as string)
+      if (!redirect) {
+        if (authStore.isAdmin) {
+          redirect = '/admin'
+        } else if (authStore.isCustomer) {
+          redirect = '/reports'
+        } else {
+          redirect = '/'
+        }
+      }
       router.push(redirect)
     } else {
       ElMessage.error('用户名或密码错误')

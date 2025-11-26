@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.models.user import User
 from app.models.stock import ImportBatch, MetricType
 from app.services.import_service import ImportService
@@ -26,9 +26,9 @@ async def upload_file(
     metric_code: Optional[str] = Form(None, description="Metric code for TXT files"),
     data_date: Optional[str] = Form(None, description="Data date for TXT files (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """Upload file for import."""
+    """Upload file for import - Admin only."""
     # Validate file type
     file_type = file_type.upper()
     if file_type not in ("CSV", "TXT"):
@@ -189,9 +189,9 @@ async def list_batches(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """Get import batch list."""
+    """Get import batch list - Admin only."""
     query = db.query(ImportBatch).order_by(ImportBatch.created_at.desc())
 
     if status:
@@ -231,9 +231,9 @@ async def list_batches(
 async def get_batch(
     batch_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """Get import batch detail."""
+    """Get import batch detail - Admin only."""
     batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
 
     if not batch:
@@ -267,9 +267,9 @@ async def get_batch(
 async def recompute_batch(
     batch_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
 ):
-    """Recompute rankings and summaries for a batch."""
+    """Recompute rankings and summaries for a batch - Admin only."""
     batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
 
     if not batch:
