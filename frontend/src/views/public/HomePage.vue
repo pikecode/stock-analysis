@@ -191,8 +191,8 @@ const topStocks = ref([
 .header .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
-  height: 64px;
+  padding: 0 16px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -201,19 +201,20 @@ const topStocks = ref([
 .logo {
   display: flex;
   align-items: center;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
   cursor: pointer;
+  gap: 4px;
 }
 
 .logo-icon {
-  font-size: 28px;
-  margin-right: 8px;
+  font-size: 24px;
+  margin-right: 0;
 }
 
 .nav {
-  display: flex;
-  gap: 32px;
+  display: none;
+  gap: 24px;
 }
 
 .nav a {
@@ -221,10 +222,52 @@ const topStocks = ref([
   text-decoration: none;
   cursor: pointer;
   transition: color 0.3s;
+  font-size: 14px;
 }
 
 .nav a:hover {
   color: #409EFF;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .header .container {
+    height: 64px;
+    padding: 0 20px;
+  }
+
+  .logo {
+    font-size: 18px;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    font-size: 28px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 28px;
+  }
+
+  .nav a {
+    font-size: 15px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .logo {
+    font-size: 20px;
+  }
+
+  .nav {
+    gap: 32px;
+  }
+
+  .nav a {
+    font-size: 16px;
+  }
 }
 
 .auth-buttons {
@@ -236,99 +279,205 @@ const topStocks = ref([
 .hero {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 100px 20px;
+  padding: 60px 20px;
   text-align: center;
 }
 
 .hero-content h1 {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 28px;
+  margin-bottom: 12px;
+  line-height: 1.2;
 }
 
 .hero-content p {
-  font-size: 20px;
-  margin-bottom: 40px;
+  font-size: 16px;
+  margin-bottom: 30px;
   opacity: 0.9;
+  line-height: 1.5;
 }
 
 .search-box {
-  max-width: 600px;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 0 0;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .hero {
+    padding: 80px 20px;
+  }
+
+  .hero-content h1 {
+    font-size: 36px;
+    margin-bottom: 16px;
+  }
+
+  .hero-content p {
+    font-size: 18px;
+    margin-bottom: 36px;
+  }
+
+  .search-box {
+    max-width: 500px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .hero {
+    padding: 100px 20px;
+  }
+
+  .hero-content h1 {
+    font-size: 48px;
+  }
+
+  .hero-content p {
+    font-size: 20px;
+    margin-bottom: 40px;
+  }
+
+  .search-box {
+    max-width: 600px;
+  }
 }
 
 /* 功能卡片 */
 .features {
-  padding: 80px 20px;
+  padding: 40px 20px;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 16px;
 }
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
 .feature-card {
   background: white;
-  padding: 32px;
-  border-radius: 12px;
+  padding: 24px 16px;
+  border-radius: 8px;
   text-align: center;
   cursor: pointer;
   transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
 }
 
 .feature-card h3 {
-  margin: 16px 0 8px;
-  font-size: 20px;
+  margin: 12px 0 8px;
+  font-size: 16px;
 }
 
 .feature-card p {
   color: #909399;
   line-height: 1.6;
+  font-size: 14px;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .features {
+    padding: 60px 20px;
+  }
+
+  .container {
+    padding: 0 20px;
+  }
+
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .feature-card {
+    padding: 28px 20px;
+    border-radius: 10px;
+  }
+
+  .feature-card h3 {
+    font-size: 18px;
+  }
+
+  .feature-card p {
+    font-size: 15px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .features {
+    padding: 80px 20px;
+  }
+
+  .feature-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+
+  .feature-card {
+    padding: 32px;
+    border-radius: 12px;
+  }
+
+  .feature-card h3 {
+    font-size: 20px;
+  }
+
+  .feature-card p {
+    font-size: 16px;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+  }
 }
 
 /* 数据展示 */
 .data-section {
-  padding: 40px 20px 80px;
+  padding: 40px 20px;
   background: #f0f2f5;
 }
 
 .data-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
 .data-card {
   background: white;
-  padding: 24px;
-  border-radius: 12px;
+  padding: 20px 16px;
+  border-radius: 8px;
 }
 
 .data-card h3 {
-  margin-bottom: 20px;
-  font-size: 18px;
+  margin-bottom: 16px;
+  font-size: 16px;
   color: #303133;
 }
 
 .concept-list, .stock-list {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .concept-item, .stock-item {
   display: flex;
   align-items: center;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #EBEEF5;
+  font-size: 14px;
 }
 
 .concept-item:last-child, .stock-item:last-child {
@@ -342,11 +491,12 @@ const topStocks = ref([
 
 .concept-count {
   color: #909399;
-  margin-right: 16px;
+  margin-right: 12px;
+  font-size: 12px;
 }
 
 .concept-trend {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
 }
 
@@ -361,54 +511,233 @@ const topStocks = ref([
 .stock-info {
   flex: 1;
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  align-items: center;
 }
 
 .stock-code {
   font-weight: bold;
   color: #409EFF;
+  font-size: 13px;
+}
+
+.stock-name {
+  font-size: 14px;
 }
 
 .stock-change {
   font-weight: bold;
+  font-size: 14px;
+  min-width: 60px;
+  text-align: right;
 }
 
 .stock-change.positive {
   color: #F56C6C;
 }
 
+/* 平板设备 */
+@media (min-width: 768px) {
+  .data-section {
+    padding: 60px 20px;
+  }
+
+  .data-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .data-card {
+    padding: 24px;
+    border-radius: 10px;
+  }
+
+  .data-card h3 {
+    margin-bottom: 18px;
+    font-size: 18px;
+  }
+
+  .concept-list, .stock-list {
+    margin-bottom: 18px;
+  }
+
+  .concept-item, .stock-item {
+    padding: 12px 0;
+    font-size: 15px;
+  }
+
+  .concept-count {
+    margin-right: 16px;
+    font-size: 13px;
+  }
+
+  .stock-code {
+    font-size: 14px;
+  }
+
+  .stock-name {
+    font-size: 15px;
+  }
+
+  .stock-change {
+    font-size: 15px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .data-section {
+    padding: 80px 20px;
+  }
+
+  .data-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .data-card {
+    padding: 28px;
+    border-radius: 12px;
+  }
+
+  .data-card h3 {
+    margin-bottom: 20px;
+    font-size: 20px;
+  }
+
+  .concept-list, .stock-list {
+    margin-bottom: 20px;
+  }
+
+  .concept-item, .stock-item {
+    padding: 14px 0;
+    font-size: 15px;
+  }
+
+  .concept-count {
+    margin-right: 16px;
+    font-size: 14px;
+  }
+
+  .stock-code {
+    font-size: 15px;
+  }
+
+  .stock-name {
+    font-size: 15px;
+  }
+
+  .stock-change {
+    font-size: 15px;
+  }
+}
+
 /* CTA 区域 */
 .cta {
   background: white;
-  padding: 80px 20px;
+  padding: 60px 20px;
   text-align: center;
 }
 
 .cta h2 {
-  font-size: 32px;
-  margin-bottom: 16px;
+  font-size: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
 }
 
 .cta p {
-  font-size: 18px;
+  font-size: 15px;
   color: #606266;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .cta {
+    padding: 80px 20px;
+  }
+
+  .cta h2 {
+    font-size: 28px;
+    margin-bottom: 14px;
+  }
+
+  .cta p {
+    font-size: 16px;
+    margin-bottom: 28px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .cta {
+    padding: 100px 20px;
+  }
+
+  .cta h2 {
+    font-size: 32px;
+    margin-bottom: 16px;
+  }
+
+  .cta p {
+    font-size: 18px;
+    margin-bottom: 32px;
+  }
 }
 
 /* 页脚 */
 .footer {
   background: #2c3e50;
   color: white;
-  padding: 32px 20px;
+  padding: 24px 16px;
   text-align: center;
+  font-size: 13px;
+}
+
+.footer p {
+  margin: 8px 0;
+  line-height: 1.5;
 }
 
 .footer .el-link {
   color: #ecf0f1;
+  font-size: 13px;
 }
 
 .separator {
-  margin: 0 16px;
+  margin: 0 8px;
   opacity: 0.5;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .footer {
+    padding: 32px 20px;
+    font-size: 14px;
+  }
+
+  .footer p {
+    margin: 10px 0;
+  }
+
+  .footer .el-link {
+    font-size: 14px;
+  }
+
+  .separator {
+    margin: 0 12px;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .footer {
+    padding: 40px 20px;
+    font-size: 14px;
+  }
+
+  .footer p {
+    margin: 12px 0;
+  }
 }
 </style>
