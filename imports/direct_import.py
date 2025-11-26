@@ -6,7 +6,10 @@ from datetime import date
 from pathlib import Path
 
 # 添加项目路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# 脚本位置: imports/direct_import.py -> 项目根 -> backend
+project_root = Path(__file__).parent.parent
+backend_path = project_root / "backend"
+sys.path.insert(0, str(backend_path))
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine

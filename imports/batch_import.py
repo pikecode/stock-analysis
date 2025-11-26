@@ -2,20 +2,20 @@
 """
 批量导入脚本 - 支持大文件自动拆分和并行处理
 Usage:
-    python scripts/batch_import.py <file> --type TXT --metric-code <code> [options]
+    python imports/batch_import.py <file> --type TXT --metric-code <code> [options]
 
 Examples:
     # 基础用法
-    python scripts/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE
+    python imports/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE
 
     # 并行处理
-    python scripts/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --parallel 4
+    python imports/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --parallel 4
 
     # 从指定日期继续
-    python scripts/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --resume-from 2024-01-01
+    python imports/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --resume-from 2024-01-01
 
     # 只处理特定日期范围
-    python scripts/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --start-date 2024-01-01 --end-date 2024-12-31
+    python imports/batch_import.py /path/to/EEE.txt --type TXT --metric-code EEE --start-date 2024-01-01 --end-date 2024-12-31
 """
 
 import sys
@@ -37,7 +37,11 @@ import signal
 import atexit
 
 # 添加项目路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 脚本位置: imports/batch_import.py
+# 需要访问: backend/app/...
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+backend_path = os.path.join(project_root, 'backend')
+sys.path.insert(0, backend_path)
 
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine

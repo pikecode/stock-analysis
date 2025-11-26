@@ -21,7 +21,7 @@ import_csv() {
         echo -e "${RED}用法: import_csv <csv文件路径>${NC}"
         return 1
     fi
-    python "$PROJECT_ROOT/scripts/imports/direct_import.py" "$1" --type CSV
+    python "$PROJECT_ROOT/imports/direct_import.py" "$1" --type CSV
 }
 
 # TXT单文件导入
@@ -32,7 +32,7 @@ import_txt() {
         echo -e "${YELLOW}示例: import_txt data.txt EEE${NC}"
         return 1
     fi
-    python "$PROJECT_ROOT/scripts/imports/direct_import.py" "$1" --type TXT --metric-code "$2"
+    python "$PROJECT_ROOT/imports/direct_import.py" "$1" --type TXT --metric-code "$2"
 }
 
 # TXT批量导入
@@ -44,7 +44,7 @@ batch_import() {
         return 1
     fi
     local parallel=${3:-4}
-    python "$PROJECT_ROOT/scripts/imports/batch_import.py" "$1" --metric-code "$2" --parallel "$parallel"
+    python "$PROJECT_ROOT/imports/batch_import.py" "$1" --metric-code "$2" --parallel "$parallel"
 }
 
 # 继续导入（断点续传）
@@ -55,7 +55,7 @@ resume_import() {
         return 1
     fi
     local parallel=${3:-4}
-    python "$PROJECT_ROOT/scripts/imports/batch_import.py" "$1" --metric-code "$2" --parallel "$parallel" --resume
+    python "$PROJECT_ROOT/imports/batch_import.py" "$1" --metric-code "$2" --parallel "$parallel" --resume
 }
 
 # ========== 数据库命令 ==========
@@ -165,7 +165,7 @@ test_import() {
 000001	2024-11-21	2000000
 000002	2024-11-21	2500000
 EOF
-    python "$PROJECT_ROOT/scripts/imports/direct_import.py" /tmp/test_import.txt --type TXT --metric-code TEST
+    python "$PROJECT_ROOT/imports/direct_import.py" /tmp/test_import.txt --type TXT --metric-code TEST
 }
 
 # 显示帮助
