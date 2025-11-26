@@ -1,0 +1,75 @@
+{
+  "project_name": "stock-analysis",
+  "scanned_at": "2025-11-26T00:00:00Z",
+  "version": "1.0.0",
+  "overview": {
+    "type": "full-stack-web-application",
+    "primary_languages": ["TypeScript", "Python"],
+    "frameworks": ["Vue 3", "FastAPI"],
+    "architecture": "frontend-backend-separated"
+  },
+  "modules": [
+    {
+      "name": "frontend",
+      "path": "frontend/",
+      "type": "spa-application",
+      "language": "TypeScript",
+      "framework": "Vue 3 + Vite",
+      "entry_points": ["src/main.ts"],
+      "key_files": [
+        "src/router/index.ts",
+        "src/stores/auth.ts",
+        "src/api/request.ts",
+        "vite.config.ts",
+        "package.json"
+      ],
+      "has_tests": false,
+      "has_config": true
+    },
+    {
+      "name": "backend",
+      "path": "backend/",
+      "type": "api-server",
+      "language": "Python",
+      "framework": "FastAPI",
+      "entry_points": ["main.py", "app/main.py"],
+      "key_files": [
+        "app/main.py",
+        "app/core/config.py",
+        "app/core/database.py",
+        "app/core/security.py",
+        "app/models/stock.py",
+        "requirements.txt"
+      ],
+      "has_tests": true,
+      "has_config": true
+    }
+  ],
+  "coverage": {
+    "total_files_estimated": 150,
+    "scanned_files": 89,
+    "coverage_percentage": 59,
+    "gaps": [
+      "未完全扫描所有 Vue 组件实现细节",
+      "部分后端 API 路由实现未读取",
+      "测试文件未完整扫描"
+    ]
+  },
+  "ignore_patterns": [
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    "__pycache__/**",
+    "*.log",
+    "venv/**",
+    ".venv/**",
+    "uploads/**"
+  ],
+  "next_steps": [
+    "建议优先补扫：backend/app/api/ 下的所有路由实现",
+    "补充前端组件库实现细节扫描",
+    "扫描测试文件（如有）以了解测试策略"
+  ],
+  "truncated": false
+}
