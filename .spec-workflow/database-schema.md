@@ -320,8 +320,6 @@ concept_name=沪股通, category=交易制度
 | trade_date | DATE | 交易日期 | NOT NULL |
 | trade_value | BIGINT | 股票的指标值 | ⚠️ 来自stock_metric_data_raw |
 | rank | INTEGER | 排名 | 在该概念内的排名位置 |
-| total_stocks | INTEGER | 总股票数 | 该概念在该日期有多少只股票 |
-| percentile | NUMERIC(5,2) | 百分比排名 | 如：95.30 表示排名前5.30% |
 | computed_at | TIMESTAMP | 计算时间 | 默认当前时间 |
 | import_batch_id | INTEGER | 所属导入批次 | FK → import_batches |
 
@@ -332,7 +330,7 @@ concept_name=沪股通, category=交易制度
 - `rank` = 该股票在该概念内的排名（相同的trade_value会同时排名）
 - 例如：600000在"银行"概念下的EEE排名是13，但600000的trade_value值1137952是它本身的EEE指标值，与其他股票无关
 
-**计算SQL**（来自 `compute_service.py` 第43-88行）：
+**计算SQL**（来自 `compute_service.py`）：
 ```sql
 INSERT INTO concept_stock_daily_rank (...)
 SELECT
@@ -345,11 +343,7 @@ SELECT
     DENSE_RANK() OVER (
         PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
         ORDER BY r.trade_value DESC
-    ) as rank,
-    COUNT(*) OVER (
-        PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
-    ) as total_stocks,
-    ROUND(100.0 * (1 - (DENSE_RANK() ... - 1) / COUNT(*) ...), 2) as percentile
+    ) as rank
 FROM stock_metric_data_raw r
 JOIN stock_concepts sc ON r.stock_code = sc.stock_code
 WHERE r.import_batch_id = :batch_id AND r.is_valid = true
@@ -544,11 +538,6 @@ trade_value排序：
 ...
 44659   → rank 43  (最低)
 
-percentile计算：
-rank 13, total 43 → percentile = 100 * (1 - (13-1)/43) = 72.09%
-                   → 表示排名前27.91%
-```
-
 ### 汇总计算（Aggregation）
 
 **目的**：统计每个概念的整体情况
@@ -612,9 +601,9 @@ rank 13, total 43 → percentile = 100 * (1 - (13-1)/43) = 72.09%
 ```
 600000 (浦发银行) EEE值 = 1137952 (这是全局值)
 
-在"银行"概念内：rank=13, percentile=72.09, trade_value=1137952
-在"上海板块"概念内：rank=12, percentile=97.04, trade_value=1137952 (相同)
-在"融资融券"概念内：rank=81, percentile=97.38, trade_value=1137952 (相同)
+在"银行"概念内：rank=13, trade_value=1137952
+在"上海板块"概念内：rank=12, trade_value=1137952 (相同)
+在"融资融券"概念内：rank=81, trade_value=1137952 (相同)
 
 相同的原因：同一天同一指标，这个股票只有一个 trade_value 值
 ```
@@ -675,8 +664,6 @@ SELECT
     c.concept_name,
     r.stock_code,
     r.rank,
-    r.total_stocks,
-    r.percentile,
     r.trade_value
 FROM concept_stock_daily_rank r
 JOIN concepts c ON r.concept_id = c.id
@@ -688,8 +675,8 @@ WHERE r.stock_code = '600000'
 
 **结果**：
 ```
-concept_name | stock_code | rank | total_stocks | percentile | trade_value
-银行         | 600000     | 13   | 43           | 72.09      | 1137952
+concept_name | stock_code | rank | trade_value
+银行         | 600000     | 13   | 1137952
 ```
 
 ### 查询2：获取概念的汇总统计
@@ -727,9 +714,7 @@ concept_name | stock_count | total_value | avg_value | max_value | min_value | m
 SELECT
     c.concept_name,
     r.rank,
-    r.total_stocks,
-    r.percentile,
-    ROUND(100.0 * r.rank / r.total_stocks, 2) as rank_percentage
+    r.trade_value
 FROM concept_stock_daily_rank r
 JOIN concepts c ON r.concept_id = c.id
 WHERE r.stock_code = '600000'
@@ -740,10 +725,10 @@ ORDER BY r.rank ASC;
 
 **结果**：
 ```
-concept_name  | rank | total_stocks | percentile | rank_percentage
-转债标的      | 6    | 69           | 99.35      | 8.70
-上海板块      | 12   | 75           | 97.04      | 16.00
-银行          | 13   | 43           | 72.09      | 30.23
+concept_name  | rank | trade_value
+转债标的      | 6    | 1137952
+上海板块      | 12   | 1137952
+银行          | 13   | 1137952
 ...
 ```
 
@@ -756,7 +741,6 @@ SELECT
     s.stock_code,
     s.stock_name,
     r.rank,
-    r.percentile,
     r.trade_value
 FROM concept_stock_daily_rank r
 JOIN stocks s ON r.stock_code = s.stock_code

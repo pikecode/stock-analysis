@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { reportApi } from '@/api'
+import { reportApi, conceptApi } from '@/api'
 import dayjs from 'dayjs'
 
 interface ConceptRankedItem {
@@ -11,10 +11,20 @@ interface ConceptRankedItem {
   category?: string
   trade_value?: number
   rank?: number
-  percentile?: number
   concept_total_value?: number
   concept_stock_count?: number
   concept_avg_value?: number
+  stocks?: StockItem[]
+  stocksLoading?: boolean
+  stocksPage?: number
+  stocksTotal?: number
+  isExpanded?: boolean
+}
+
+interface StockItem {
+  id?: number
+  stock_code: string
+  stock_name: string
 }
 
 interface QueryResult {
@@ -145,6 +155,69 @@ const handleYesterday = () => {
 
 const handleLastWeek = () => {
   selectedDate.value = dayjs().subtract(7, 'day').format('YYYY-MM-DD')
+}
+
+// 切换展开/收起
+const toggleExpand = async (concept: ConceptRankedItem) => {
+  concept.isExpanded = !concept.isExpanded
+
+  // 展开时加载股票数据
+  if (concept.isExpanded && !concept.stocks) {
+    await loadConceptStocks(concept)
+  }
+}
+
+// 加载概念下的股票列表
+const loadConceptStocks = async (concept: ConceptRankedItem) => {
+  if (concept.stocks) {
+    // 已加载过，直接返回
+    return
+  }
+
+  concept.stocksLoading = true
+  concept.stocksPage = 1
+  concept.stocks = []
+
+  try {
+    const response = await conceptApi.getStocks(concept.id, {
+      page: 1,
+      page_size: 10,
+    })
+
+    if (response && response.stocks) {
+      concept.stocks = response.stocks
+      concept.stocksTotal = response.total
+      concept.stocksPage = 1
+    }
+  } catch (error: any) {
+    ElMessage.error('加载股票列表失败')
+    concept.stocks = []
+  } finally {
+    concept.stocksLoading = false
+  }
+}
+
+// 加载更多股票
+const loadMoreStocks = async (concept: ConceptRankedItem) => {
+  if (!concept.stocks || !concept.stocksPage) {
+    return
+  }
+
+  const nextPage = concept.stocksPage + 1
+
+  try {
+    const response = await conceptApi.getStocks(concept.id, {
+      page: nextPage,
+      page_size: 10,
+    })
+
+    if (response && response.stocks) {
+      concept.stocks = [...(concept.stocks || []), ...response.stocks]
+      concept.stocksPage = nextPage
+    }
+  } catch (error: any) {
+    ElMessage.error('加载更多股票失败')
+  }
 }
 </script>
 
@@ -278,29 +351,23 @@ const handleLastWeek = () => {
 
         <!-- 概念列表 -->
         <div v-if="queryResult.concepts.length > 0" class="concepts-section">
-          <h3>概念列表（按 {{ metricCode }} 交易量从高到低排序）</h3>
+          <h3>关联概念列表</h3>
           <el-table
             :data="queryResult.concepts"
             stripe
             style="width: 100%"
-            :default-sort="{ prop: 'trade_value', order: 'descending' }"
           >
-            <el-table-column prop="concept_name" label="概念名称" min-width="150" />
-            <el-table-column prop="category" label="分类" width="120" />
-            <el-table-column
-              prop="trade_value"
-              label="交易量"
-              width="150"
-              align="center"
-              sortable="custom"
-            >
+            <el-table-column label="操作" width="50" align="center">
               <template #default="{ row }">
-                <span v-if="row.trade_value" class="trade-value-highlight">
-                  {{ formatTradeValue(row.trade_value) }}
-                </span>
-                <span v-else>-</span>
+                <el-button
+                  link
+                  type="primary"
+                  :icon="row.isExpanded ? 'ArrowDown' : 'ArrowRight'"
+                  @click.stop="toggleExpand(row)"
+                />
               </template>
             </el-table-column>
+            <el-table-column prop="concept_name" label="概念名称" min-width="150" />
             <el-table-column prop="rank" label="排名" width="100" align="center">
               <template #default="{ row }">
                 <span v-if="row.rank">
@@ -310,17 +377,14 @@ const handleLastWeek = () => {
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="percentile" label="百分位" width="120" align="center">
+            <el-table-column
+              prop="concept_total_value"
+              label="概念总交易量"
+              min-width="140"
+              align="center"
+            >
               <template #default="{ row }">
-                <span v-if="row.percentile !== null && row.percentile !== undefined">
-                  {{ (row.percentile * 100).toFixed(1) }}%
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="concept_total_value" label="概念总交易量" min-width="140" align="center">
-              <template #default="{ row }">
-                <span v-if="row.concept_total_value">
+                <span v-if="row.concept_total_value" class="concept-total-value-highlight">
                   {{ formatTradeValue(row.concept_total_value) }}
                 </span>
                 <span v-else>-</span>
@@ -344,6 +408,41 @@ const handleLastWeek = () => {
             </el-table-column>
           </el-table>
 
+          <!-- 展开行内容 -->
+          <div
+            v-for="concept in queryResult.concepts.filter(c => c.isExpanded)"
+            :key="concept.id"
+            class="stock-list-wrapper"
+          >
+            <div class="stock-list-container">
+              <div v-if="concept.stocksLoading" class="loading">
+                <el-skeleton :rows="3" animated />
+              </div>
+              <div v-else-if="concept.stocks && concept.stocks.length > 0" class="stocks-list">
+                <h4>{{ concept.concept_name }} - 股票列表</h4>
+                <el-table :data="concept.stocks" stripe style="width: 100%">
+                  <el-table-column prop="stock_code" label="股票代码" width="120" />
+                  <el-table-column prop="stock_name" label="股票名称" min-width="150" />
+                </el-table>
+                <div v-if="concept.stocks.length < concept.stocksTotal" class="load-more-btn">
+                  <el-button
+                    type="primary"
+                    link
+                    @click="loadMoreStocks(concept)"
+                  >
+                    加载更多（已加载 {{ concept.stocks.length }}/{{ concept.stocksTotal }} 个股票）
+                  </el-button>
+                </div>
+                <div v-else class="all-loaded">
+                  已全部加载 {{ concept.stocks.length }} 个股票
+                </div>
+              </div>
+              <div v-else class="empty-stocks">
+                暂无股票数据
+              </div>
+            </div>
+          </div>
+
           <!-- 数据说明 -->
           <div class="data-tips">
             <el-alert type="info" :closable="false">
@@ -351,9 +450,7 @@ const handleLastWeek = () => {
                 <div class="tips-content">
                   <p><strong>数据说明：</strong></p>
                   <ul>
-                    <li><strong>交易量：</strong>该股票在该概念下的 {{ metricCode }} 指标值</li>
                     <li><strong>排名：</strong>该概念在该股票、该日期、该指标下的排名位次</li>
-                    <li><strong>百分位：</strong>该概念在所有概念中的相对排名（0-1）</li>
                     <li><strong>概念总交易量：</strong>该概念在该日期、该指标下所有股票的总交易量</li>
                     <li><strong>概念股票数：</strong>该概念包含的股票数量</li>
                     <li><strong>概念平均交易量：</strong>该概念在该日期、该指标下的平均交易量（总交易量 ÷ 股票数）</li>
@@ -531,6 +628,58 @@ const handleLastWeek = () => {
   font-size: 14px;
 }
 
+.concept-total-value-highlight {
+  color: #409eff;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* 展开行样式 */
+.stock-list-container {
+  padding: 16px 0;
+  background: #f9fafc;
+  border-radius: 4px;
+}
+
+.stock-list-container h4 {
+  margin: 0 0 16px 0;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 16px;
+}
+
+.stocks-list {
+  padding: 0 16px;
+}
+
+.load-more-btn {
+  text-align: center;
+  padding: 12px 0;
+  margin-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.all-loaded {
+  text-align: center;
+  padding: 12px 0;
+  margin-top: 12px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.loading {
+  padding: 16px;
+  background: #f9fafc;
+  border-radius: 4px;
+}
+
+.empty-stocks {
+  text-align: center;
+  padding: 20px;
+  color: #909399;
+}
+
 .data-tips {
   margin-top: 16px;
 }
@@ -643,5 +792,25 @@ const handleLastWeek = () => {
   .form-row.buttons {
     width: 300px;
   }
+}
+
+/* 嵌套表格样式 */
+:deep(.stock-list-container .el-table) {
+  background: transparent !important;
+  border: none;
+}
+
+:deep(.stock-list-container .el-table__header th) {
+  background-color: #f5f7fa !important;
+  border-top: 1px solid #ebeef5 !important;
+  border-bottom: 1px solid #ebeef5 !important;
+}
+
+:deep(.stock-list-container .el-table__row) {
+  background-color: transparent !important;
+}
+
+:deep(.stock-list-container .el-table__row:hover > td) {
+  background-color: #f5f7fa !important;
 }
 </style>

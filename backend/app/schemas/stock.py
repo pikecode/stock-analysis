@@ -84,7 +84,6 @@ class RankingItem(BaseModel):
     stock_code: str
     stock_name: Optional[str] = None
     trade_value: int
-    percentile: Optional[float] = None
 
 
 class ConceptRankingResponse(BaseModel):
@@ -94,7 +93,6 @@ class ConceptRankingResponse(BaseModel):
     concept_name: str
     trade_date: date
     metric_code: str
-    total_stocks: int
     rankings: list[RankingItem]
 
 
@@ -104,8 +102,6 @@ class StockRankingHistory(BaseModel):
     trade_date: date
     rank: int
     trade_value: int
-    total_stocks: int
-    percentile: Optional[float] = None
 
 
 class StockRankingHistoryResponse(BaseModel):
@@ -216,7 +212,6 @@ class ConceptRankedItem(BaseModel):
     category: Optional[str] = None
     trade_value: Optional[int] = None
     rank: Optional[int] = None
-    percentile: Optional[float] = None
     concept_total_value: Optional[int] = None
     concept_stock_count: Optional[int] = None
     concept_avg_value: Optional[float] = None
@@ -242,7 +237,6 @@ class StockRankingInRangeItem(BaseModel):
     stock_name: Optional[str] = None
     rank: int
     trade_value: int
-    percentile: Optional[float] = None
     trade_date: Optional[date] = None
 
 
@@ -255,5 +249,4 @@ class ConceptStocksRankingRangeResponse(BaseModel):
     start_date: date
     end_date: date
     query_date: Optional[date] = None  # 实际查询的日期（如果使用latest_date）
-    total_stocks: int
     stocks: list[StockRankingInRangeItem]

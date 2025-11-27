@@ -291,8 +291,6 @@ CREATE TABLE IF NOT EXISTS concept_stock_daily_rank (
     trade_date DATE NOT NULL,
     trade_value BIGINT NOT NULL,
     rank INTEGER NOT NULL,
-    total_stocks INTEGER,
-    percentile DECIMAL(5, 2),
     computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     import_batch_id INTEGER REFERENCES import_batches(id),
     PRIMARY KEY (id, trade_date)
@@ -434,7 +432,7 @@ BEGIN
     -- 插入或更新排名数据
     INSERT INTO concept_stock_daily_rank (
         metric_type_id, metric_code, concept_id, stock_code, trade_date,
-        trade_value, rank, total_stocks, percentile, import_batch_id
+        trade_value, rank, import_batch_id
     )
     SELECT
         r.metric_type_id,
@@ -447,14 +445,6 @@ BEGIN
             PARTITION BY sc.concept_id, r.trade_date
             ORDER BY r.trade_value DESC
         ) as rank,
-        COUNT(*) OVER (PARTITION BY sc.concept_id, r.trade_date) as total_stocks,
-        ROUND(
-            100.0 * (1 - (DENSE_RANK() OVER (
-                PARTITION BY sc.concept_id, r.trade_date
-                ORDER BY r.trade_value DESC
-            ) - 1)::DECIMAL / NULLIF(COUNT(*) OVER (PARTITION BY sc.concept_id, r.trade_date), 0)
-            ), 2
-        ) as percentile,
         r.import_batch_id
     FROM stock_metric_data_raw r
     JOIN stock_concepts sc ON r.stock_code = sc.stock_code
@@ -464,8 +454,6 @@ BEGIN
     DO UPDATE SET
         trade_value = EXCLUDED.trade_value,
         rank = EXCLUDED.rank,
-        total_stocks = EXCLUDED.total_stocks,
-        percentile = EXCLUDED.percentile,
         computed_at = CURRENT_TIMESTAMP,
         import_batch_id = EXCLUDED.import_batch_id;
 

@@ -174,8 +174,6 @@ class ConceptStockDailyRank(Base):
     trade_date = Column(Date, nullable=False, index=True)
     trade_value = Column(BigInteger, nullable=False)
     rank = Column(Integer, nullable=False)
-    total_stocks = Column(Integer)
-    percentile = Column(Numeric(5, 2))
     computed_at = Column(DateTime, default=datetime.utcnow)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id"))
 

@@ -45,7 +45,7 @@ class ComputeService:
         sql = text("""
             INSERT INTO concept_stock_daily_rank (
                 metric_type_id, metric_code, concept_id, stock_code, trade_date,
-                trade_value, rank, total_stocks, percentile, import_batch_id
+                trade_value, rank, import_batch_id
             )
             SELECT
                 r.metric_type_id,
@@ -58,17 +58,6 @@ class ComputeService:
                     PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
                     ORDER BY r.trade_value DESC
                 ) as rank,
-                COUNT(*) OVER (
-                    PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
-                ) as total_stocks,
-                ROUND(
-                    100.0 * (1 - (DENSE_RANK() OVER (
-                        PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
-                        ORDER BY r.trade_value DESC
-                    ) - 1)::DECIMAL / NULLIF(COUNT(*) OVER (
-                        PARTITION BY r.metric_type_id, sc.concept_id, r.trade_date
-                    ), 0)), 2
-                ) as percentile,
                 :batch_id as import_batch_id
             FROM stock_metric_data_raw r
             JOIN stock_concepts sc ON r.stock_code = sc.stock_code
@@ -78,8 +67,6 @@ class ComputeService:
             DO UPDATE SET
                 trade_value = EXCLUDED.trade_value,
                 rank = EXCLUDED.rank,
-                total_stocks = EXCLUDED.total_stocks,
-                percentile = EXCLUDED.percentile,
                 computed_at = CURRENT_TIMESTAMP,
                 import_batch_id = EXCLUDED.import_batch_id
         """)

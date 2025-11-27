@@ -8,6 +8,8 @@ import {
   User,
   SwitchButton,
   Menu,
+  Fold,
+  Expand,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -18,6 +20,7 @@ const authStore = useAuthStore()
 const isMobile = ref(false)
 const drawerVisible = ref(false)
 const windowWidth = ref(window.innerWidth)
+const isCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
 
 // 计算是否是移动设备
 const checkMobile = () => {
@@ -54,6 +57,17 @@ const handleNavigation = (index: string) => {
     drawerVisible.value = false
   }
 }
+
+// 切换侧边栏展开/收起
+const toggleSidebar = () => {
+  isCollapsed.value = !isCollapsed.value
+  localStorage.setItem('sidebar-collapsed', isCollapsed.value.toString())
+}
+
+// 计算侧边栏宽度
+const sidebarWidth = computed(() => {
+  return isCollapsed.value ? '64px' : '200px'
+})
 </script>
 
 <template>
@@ -130,9 +144,23 @@ const handleNavigation = (index: string) => {
     </el-drawer>
 
     <!-- PC 侧边栏 -->
-    <el-aside v-if="!isMobile" width="200px" class="sidebar">
+    <el-aside v-if="!isMobile" :width="sidebarWidth" class="sidebar" :class="{ collapsed: isCollapsed }">
       <div class="logo">
-        <h2>📈 数据分析</h2>
+        <div class="logo-content">
+          <h2 v-if="!isCollapsed" class="logo-title">📈 数据分析</h2>
+          <h2 v-else class="logo-title-collapsed">📈</h2>
+        </div>
+        <el-button
+          type="text"
+          class="toggle-btn"
+          @click="toggleSidebar"
+          :title="isCollapsed ? '展开菜单' : '收起菜单'"
+        >
+          <el-icon :class="{ 'icon-rotate': !isCollapsed }">
+            <Fold v-if="!isCollapsed" />
+            <Expand v-else />
+          </el-icon>
+        </el-button>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -140,6 +168,7 @@ const handleNavigation = (index: string) => {
         background-color="#304156"
         text-color="#bfcbd9"
         active-text-color="#409EFF"
+        :collapse="isCollapsed"
       >
         <!-- 报表分析 -->
         <el-sub-menu index="/reports">
@@ -224,21 +253,77 @@ const handleNavigation = (index: string) => {
     background-color: #304156;
     overflow-y: auto;
     flex-shrink: 0;
+    transition: width 0.3s ease;
+    position: relative;
+  }
+
+  .sidebar.collapsed {
+    overflow-x: hidden;
   }
 
   .logo {
     height: 60px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 12px;
     background-color: #263445;
     border-bottom: 1px solid #1f2a3a;
+    transition: all 0.3s ease;
   }
 
-  .logo h2 {
+  .logo-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .logo-title {
     color: #fff;
-    font-size: 16px;
+    font-size: 15px;
     margin: 0;
+    white-space: nowrap;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .logo-title-collapsed {
+    color: #fff;
+    font-size: 20px;
+    margin: 0;
+    text-align: center;
+  }
+
+  .toggle-btn {
+    flex-shrink: 0;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    margin: 0 -8px 0 8px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bfcbd9 !important;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+
+  .toggle-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #409eff !important;
+  }
+
+  .toggle-btn .el-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+  }
+
+  .toggle-btn .icon-rotate {
+    transform: scaleX(-1);
   }
 
   .header {
@@ -368,5 +453,56 @@ const handleNavigation = (index: string) => {
 :deep(.el-container) {
   display: flex;
   flex-direction: column;
+}
+
+/* Element Plus 菜单折叠样式 */
+:deep(.el-menu) {
+  transition: width 0.3s ease;
+}
+
+:deep(.el-menu--collapse) {
+  width: 64px;
+}
+
+:deep(.el-menu--collapse .el-menu-item),
+:deep(.el-menu--collapse .el-sub-menu__title) {
+  padding: 0 !important;
+  text-align: center;
+}
+
+:deep(.el-menu--collapse .el-menu-item span),
+:deep(.el-menu--collapse .el-sub-menu__title span) {
+  display: none;
+}
+
+:deep(.el-menu--collapse .el-menu-item [class*='el-icon']),
+:deep(.el-menu--collapse .el-sub-menu__title [class*='el-icon']) {
+  margin: 0 !important;
+}
+
+/* 菜单项工具提示 */
+:deep(.el-popper.is-dark) {
+  background-color: rgba(16, 16, 16, 0.9);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+:deep(.el-popper.is-dark[role='tooltip'] .popper__arrow::after) {
+  border-top-color: rgba(16, 16, 16, 0.9);
+}
+
+/* 收起状态下侧边栏的额外优化 */
+@media (min-width: 768px) {
+  .sidebar.collapsed .logo {
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sidebar.collapsed .logo-content {
+    flex: 0;
+  }
+
+  .sidebar.collapsed .toggle-btn {
+    margin: 0 !important;
+  }
 }
 </style>

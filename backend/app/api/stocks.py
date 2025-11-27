@@ -180,7 +180,6 @@ async def get_stock_concepts_ranked(
             Concept.category,
             ConceptStockDailyRank.trade_value,
             ConceptStockDailyRank.rank,
-            ConceptStockDailyRank.percentile,
             ConceptDailySummary.total_value,
             concept_stock_count_subquery.c.actual_stock_count,  # Use stock_concepts count instead
             ConceptDailySummary.avg_value,
@@ -208,7 +207,7 @@ async def get_stock_concepts_ranked(
         )
         .filter(StockConcept.stock_code == stock_code)
         .distinct()
-        .order_by(ConceptStockDailyRank.trade_value.desc())
+        .order_by(ConceptDailySummary.total_value.desc())
         .all()
     )
 
@@ -220,10 +219,9 @@ async def get_stock_concepts_ranked(
             category=r[2],
             trade_value=r[3],
             rank=r[4],
-            percentile=float(r[5]) if r[5] else None,
-            concept_total_value=r[6],
-            concept_stock_count=int(r[7]) if r[7] else None,
-            concept_avg_value=float(r[8]) if r[8] else None,
+            concept_total_value=r[5],
+            concept_stock_count=int(r[6]) if r[6] else None,
+            concept_avg_value=float(r[7]) if r[7] else None,
         )
         for r in results
     ]

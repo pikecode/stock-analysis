@@ -193,11 +193,6 @@ onMounted(async () => {
                 {{ row.trade_value?.toLocaleString() }}
               </template>
             </el-table-column>
-            <el-table-column prop="percentile" label="百分位" width="100">
-              <template #default="{ row }">
-                {{ row.percentile ? (row.percentile * 100).toFixed(1) + '%' : '-' }}
-              </template>
-            </el-table-column>
           </el-table>
         </el-card>
       </el-col>

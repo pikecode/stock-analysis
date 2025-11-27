@@ -33,8 +33,6 @@ CREATE TABLE IF NOT EXISTS concept_stock_daily_rank_partitioned (
     trade_date DATE NOT NULL,
     trade_value BIGINT NOT NULL,
     rank INTEGER NOT NULL,
-    total_stocks INTEGER NOT NULL,
-    percentile DECIMAL(5, 2),
     import_batch_id INTEGER NOT NULL,
     computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id, trade_date)
@@ -156,8 +154,6 @@ SELECT
     r.trade_date,
     r.trade_value,
     r.rank,
-    r.total_stocks,
-    r.percentile,
     s.stock_name,
     c.concept_name
 FROM concept_stock_daily_rank r

@@ -57,7 +57,6 @@ export interface RankingItem {
   stock_code: string
   stock_name?: string
   trade_value: number
-  percentile?: number
 }
 
 export interface ConceptRanking {
@@ -65,7 +64,6 @@ export interface ConceptRanking {
   concept_name: string
   trade_date: string
   metric_code: string
-  total_stocks: number
   rankings: RankingItem[]
 }
 
@@ -73,8 +71,6 @@ export interface StockRankingHistory {
   trade_date: string
   rank: number
   trade_value: number
-  total_stocks: number
-  percentile?: number
 }
 
 export interface TopNCountItem {

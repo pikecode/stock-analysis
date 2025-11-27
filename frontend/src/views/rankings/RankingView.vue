@@ -181,11 +181,6 @@ onMounted(async () => {
                 {{ row.trade_value?.toLocaleString() }}
               </template>
             </el-table-column>
-            <el-table-column prop="percentile" label="百分位" width="100">
-              <template #default="{ row }">
-                {{ row.percentile ? (row.percentile * 100).toFixed(1) + '%' : '-' }}
-              </template>
-            </el-table-column>
           </el-table>
         </el-tab-pane>
 
@@ -231,12 +226,6 @@ onMounted(async () => {
             <el-table-column prop="trade_value" label="指标值">
               <template #default="{ row }">
                 {{ row.trade_value?.toLocaleString() }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="total_stocks" label="概念股票数" width="120" />
-            <el-table-column prop="percentile" label="百分位" width="100">
-              <template #default="{ row }">
-                {{ row.percentile ? (row.percentile * 100).toFixed(1) + '%' : '-' }}
               </template>
             </el-table-column>
           </el-table>

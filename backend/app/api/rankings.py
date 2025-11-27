@@ -63,7 +63,6 @@ async def get_concept_ranking(
             concept_name=concept.concept_name,
             trade_date=trade_date,
             metric_code=metric_code,
-            total_stocks=0,
             rankings=[],
         )
 
@@ -77,14 +76,12 @@ async def get_concept_ranking(
         concept_name=concept.concept_name,
         trade_date=trade_date,
         metric_code=metric_code,
-        total_stocks=rankings[0].total_stocks if rankings else 0,
         rankings=[
             RankingItem(
                 rank=r.rank,
                 stock_code=r.stock_code,
                 stock_name=stock_map.get(r.stock_code),
                 trade_value=r.trade_value,
-                percentile=float(r.percentile) if r.percentile else None,
             )
             for r in rankings
         ],
@@ -140,8 +137,6 @@ async def get_stock_ranking_history(
                 trade_date=h.trade_date,
                 rank=h.rank,
                 trade_value=h.trade_value,
-                total_stocks=h.total_stocks,
-                percentile=float(h.percentile) if h.percentile else None,
             )
             for h in history
         ],
@@ -280,7 +275,6 @@ async def get_concept_stocks_in_date_range(
                 start_date=start_date,
                 end_date=end_date,
                 query_date=None,
-                total_stocks=0,
                 stocks=[],
             )
 
@@ -309,14 +303,12 @@ async def get_concept_stocks_in_date_range(
             start_date=start_date,
             end_date=end_date,
             query_date=latest_date,
-            total_stocks=len(rankings),
             stocks=[
                 StockRankingInRangeItem(
                     stock_code=r.stock_code,
                     stock_name=stock_map.get(r.stock_code),
                     rank=r.rank,
                     trade_value=r.trade_value,
-                    percentile=float(r.percentile) if r.percentile else None,
                     trade_date=r.trade_date,
                 )
                 for r in rankings
@@ -354,7 +346,6 @@ async def get_concept_stocks_in_date_range(
                 start_date=start_date,
                 end_date=end_date,
                 query_date=None,
-                total_stocks=0,
                 stocks=[],
             )
 
@@ -370,14 +361,12 @@ async def get_concept_stocks_in_date_range(
             start_date=start_date,
             end_date=end_date,
             query_date=None,
-            total_stocks=len(rankings),
             stocks=[
                 StockRankingInRangeItem(
                     stock_code=r[0],
                     stock_name=stock_map.get(r[0]),
                     rank=int(r[3]) if r[3] else None,  # best_rank
                     trade_value=int(r[1]) if r[1] else 0,  # avg_trade_value
-                    percentile=None,
                     trade_date=None,
                 )
                 for r in rankings

@@ -283,8 +283,6 @@ class OptimizedTXTImportService:
 
             # 生成排名记录
             for rank, td in enumerate(sorted_trades, 1):
-                percentile = round(100.0 * (1 - (rank - 1) / total_stocks), 2)
-
                 rankings.append({
                     'metric_type_id': metric_type_id,
                     'metric_code': metric_code,
@@ -293,8 +291,6 @@ class OptimizedTXTImportService:
                     'trade_date': data_date,
                     'trade_value': td.trade_value,
                     'rank': rank,
-                    'total_stocks': total_stocks,
-                    'percentile': percentile,
                     'import_batch_id': batch_id
                 })
 
@@ -371,8 +367,6 @@ class OptimizedTXTImportService:
                 r['trade_date'].isoformat(),
                 r['trade_value'],
                 r['rank'],
-                r['total_stocks'],
-                r['percentile'],
                 r['import_batch_id']
             ])
 
@@ -396,16 +390,13 @@ class OptimizedTXTImportService:
                         '{r['trade_date']}',
                         {r['trade_value']},
                         {r['rank']},
-                        {r['total_stocks']},
-                        {r['percentile']},
                         {r['import_batch_id']}
                     )""")
 
                 insert_sql = f"""
                     INSERT INTO concept_stock_daily_rank (
                         metric_type_id, metric_code, concept_id, stock_code,
-                        trade_date, trade_value, rank, total_stocks,
-                        percentile, import_batch_id
+                        trade_date, trade_value, rank, import_batch_id
                     )
                     VALUES {','.join(values)}
                     ON CONFLICT (metric_type_id, concept_id, stock_code, trade_date)
