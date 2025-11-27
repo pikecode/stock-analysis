@@ -8,7 +8,6 @@ import {
   User,
   SwitchButton,
   Menu,
-  Close,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

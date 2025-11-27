@@ -15,7 +15,7 @@ const authStore = useAuthStore()
           {{ authStore.user?.email || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="角色">
-          {{ authStore.user?.role || '-' }}
+          {{ authStore.user?.roles?.join(', ') || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag type="success">激活</el-tag>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { stockApi } from '@/api'
@@ -43,10 +43,10 @@ onUnmounted(() => {
 const fetchStocks = async () => {
   loading.value = true
   try {
-    const response = await stockApi.list({
+    const response = await stockApi.getList({
       page: currentPage.value,
-      size: pageSize.value,
-      search: searchKeyword.value
+      page_size: pageSize.value,
+      keyword: searchKeyword.value
     })
     stocks.value = response.items
     total.value = response.total
@@ -74,14 +74,10 @@ const handlePageChange = (page: number) => {
 const viewDetail = (stock: Stock) => {
   router.push({
     name: 'PublicStockDetail',
-    params: { code: stock.code }
+    params: { code: stock.stock_code }
   })
 }
 
-// 格式化数字
-const formatNumber = (num: number) => {
-  return new Intl.NumberFormat('zh-CN').format(num)
-}
 </script>
 
 <template>
@@ -123,22 +119,9 @@ const formatNumber = (num: number) => {
       <!-- 股票列表 - 桌面版表格 -->
       <div v-if="!isMobile" v-loading="loading" class="stock-table">
         <el-table :data="stocks" stripe style="width: 100%">
-          <el-table-column prop="code" label="股票代码" width="120" />
-          <el-table-column prop="name" label="股票名称" width="150" />
-          <el-table-column prop="exchange" label="交易所" width="100" />
-          <el-table-column label="最新价" width="120">
-            <template #default="{ row }">
-              {{ row.latest_price ? formatNumber(row.latest_price) : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="涨跌幅" width="120">
-            <template #default="{ row }">
-              <span :class="row.change_percent >= 0 ? 'positive' : 'negative'">
-                {{ row.change_percent ? row.change_percent.toFixed(2) + '%' : '-' }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="industry" label="所属行业" />
+          <el-table-column prop="stock_code" label="股票代码" width="120" />
+          <el-table-column prop="stock_name" label="股票名称" width="150" />
+          <el-table-column prop="exchange_prefix" label="交易所" width="100" />
           <el-table-column label="操作" width="100" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" link @click="viewDetail(row)">
@@ -171,34 +154,24 @@ const formatNumber = (num: number) => {
         <div v-else class="card-grid">
           <div
             v-for="stock in stocks"
-            :key="stock.code"
+            :key="stock.stock_code"
             class="stock-card"
             @click="viewDetail(stock)"
           >
             <div class="card-header">
               <div class="stock-info">
-                <div class="stock-code">{{ stock.code }}</div>
-                <div class="stock-name">{{ stock.name }}</div>
-              </div>
-              <div
-                class="change-badge"
-                :class="stock.change_percent >= 0 ? 'positive' : 'negative'"
-              >
-                {{ stock.change_percent ? stock.change_percent.toFixed(2) + '%' : '-' }}
+                <div class="stock-code">{{ stock.stock_code }}</div>
+                <div class="stock-name">{{ stock.stock_name }}</div>
               </div>
             </div>
             <div class="card-body">
               <div class="info-row">
-                <span class="label">最新价</span>
-                <span class="value">¥{{ stock.latest_price ? formatNumber(stock.latest_price) : '-' }}</span>
-              </div>
-              <div class="info-row">
                 <span class="label">交易所</span>
-                <span class="value">{{ stock.exchange || '-' }}</span>
+                <span class="value">{{ stock.exchange_prefix || '-' }}</span>
               </div>
               <div class="info-row">
-                <span class="label">行业</span>
-                <span class="value">{{ stock.industry || '-' }}</span>
+                <span class="label">创建时间</span>
+                <span class="value">{{ stock.created_at }}</span>
               </div>
             </div>
             <div class="card-footer">

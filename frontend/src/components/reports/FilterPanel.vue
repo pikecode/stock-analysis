@@ -11,7 +11,7 @@ interface FilterData {
   topN?: number
 }
 
-const props = defineProps<{
+defineProps<{
   loading?: boolean
   showConceptId?: boolean
   showStockCode?: boolean

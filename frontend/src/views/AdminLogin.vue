@@ -24,7 +24,7 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    await authStore.login(form.value.username, form.value.password)
+    await authStore.login(form.value)
 
     // 检查是否是管理员
     if (!authStore.isAdmin) {
