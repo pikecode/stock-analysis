@@ -91,7 +91,6 @@ export interface DailySummary {
   avg_value: number
   max_value: number
   min_value: number
-  stock_count: number
   median_value?: number
   top10_sum?: number
 }
