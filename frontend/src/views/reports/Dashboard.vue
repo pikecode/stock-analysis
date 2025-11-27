@@ -4,6 +4,7 @@ import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { reportApi, conceptApi } from '@/api'
 import dayjs from 'dayjs'
+import StockRankingChart from '@/components/StockRankingChart.vue'
 
 interface ConceptRankedItem {
   id: number
@@ -19,12 +20,17 @@ interface ConceptRankedItem {
   stocksPage?: number
   stocksTotal?: number
   isExpanded?: boolean
+  showChart?: boolean
+  chartStartDate?: string
+  chartEndDate?: string
 }
 
 interface StockItem {
   id?: number
   stock_code: string
   stock_name: string
+  exchange_prefix?: string
+  trade_value?: number
 }
 
 interface QueryResult {
@@ -182,6 +188,8 @@ const loadConceptStocks = async (concept: ConceptRankedItem) => {
     const response = await conceptApi.getStocks(concept.id, {
       page: 1,
       page_size: 10,
+      trade_date: selectedDate.value,
+      metric_code: metricCode.value,
     })
 
     if (response && response.stocks) {
@@ -209,6 +217,8 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
     const response = await conceptApi.getStocks(concept.id, {
       page: nextPage,
       page_size: 10,
+      trade_date: selectedDate.value,
+      metric_code: metricCode.value,
     })
 
     if (response && response.stocks) {
@@ -217,6 +227,27 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
     }
   } catch (error: any) {
     ElMessage.error('加载更多股票失败')
+  }
+}
+
+// 切换排名图表显示
+const toggleChart = (concept: ConceptRankedItem) => {
+  concept.showChart = !concept.showChart
+
+  // 初始化日期范围：默认最近30天
+  if (concept.showChart && !concept.chartStartDate) {
+    const endDate = dayjs(selectedDate.value)
+    const startDate = endDate.subtract(30, 'days')
+    concept.chartStartDate = startDate.format('YYYY-MM-DD')
+    concept.chartEndDate = endDate.format('YYYY-MM-DD')
+  }
+}
+
+// 更新图表日期范围
+const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[]) => {
+  if (dateRange && dateRange.length === 2) {
+    concept.chartStartDate = dateRange[0]
+    concept.chartEndDate = dateRange[1]
   }
 }
 </script>
@@ -423,6 +454,14 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
                 <el-table :data="concept.stocks" stripe style="width: 100%">
                   <el-table-column prop="stock_code" label="股票代码" width="120" />
                   <el-table-column prop="stock_name" label="股票名称" min-width="150" />
+                  <el-table-column label="交易量" min-width="140" align="right">
+                    <template #default="{ row }">
+                      <span v-if="row.trade_value" class="trade-value-highlight">
+                        {{ formatTradeValue(row.trade_value) }}
+                      </span>
+                      <span v-else>-</span>
+                    </template>
+                  </el-table-column>
                 </el-table>
                 <div v-if="concept.stocks.length < concept.stocksTotal" class="load-more-btn">
                   <el-button
@@ -439,6 +478,47 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
               </div>
               <div v-else class="empty-stocks">
                 暂无股票数据
+              </div>
+
+              <!-- 排名图表区域 -->
+              <div v-if="concept.stocks && concept.stocks.length > 0" class="chart-section">
+                <div class="chart-header">
+                  <el-button
+                    type="primary"
+                    link
+                    @click="toggleChart(concept)"
+                  >
+                    {{ concept.showChart ? '隐藏' : '显示' }} 排名趋势图
+                  </el-button>
+                </div>
+
+                <!-- 图表显示区域 -->
+                <div v-if="concept.showChart" class="chart-container">
+                  <div class="date-range-selector">
+                    <label>日期范围：</label>
+                    <el-date-picker
+                      :model-value="concept.chartStartDate && concept.chartEndDate ? [concept.chartStartDate, concept.chartEndDate] : []"
+                      type="daterange"
+                      range-separator="至"
+                      start-placeholder="开始日期"
+                      end-placeholder="结束日期"
+                      format="YYYY-MM-DD"
+                      value-format="YYYY-MM-DD"
+                      @change="(dateRange) => updateChartDateRange(concept, dateRange as string[])"
+                    />
+                  </div>
+
+                  <StockRankingChart
+                    v-if="queryResult && concept.chartStartDate && concept.chartEndDate"
+                    :concept-id="concept.id"
+                    :concept-name="concept.concept_name"
+                    :stock-code="queryResult.stock_code"
+                    :stock-name="queryResult.stock_name"
+                    :metric-code="metricCode"
+                    :start-date="concept.chartStartDate"
+                    :end-date="concept.chartEndDate"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -678,6 +758,47 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
   text-align: center;
   padding: 20px;
   color: #909399;
+}
+
+/* 图表区域 */
+.chart-section {
+  padding: 16px 0;
+  border-top: 1px solid #ebeef5;
+  margin-top: 12px;
+}
+
+.chart-header {
+  padding: 0 16px 12px 16px;
+}
+
+.chart-header :deep(.el-button) {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.chart-container {
+  padding: 0 16px 16px 16px;
+  background: #f9fafc;
+  border-radius: 4px;
+}
+
+.date-range-selector {
+  padding: 12px 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.date-range-selector label {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.date-range-selector :deep(.el-date-picker) {
+  width: 100%;
+  max-width: 400px;
 }
 
 .data-tips {
