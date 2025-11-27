@@ -383,7 +383,7 @@ WHERE r.import_batch_id = :batch_id AND r.is_valid = true
 
 **实际例子**（2025-11-04 EEE指标 银行概念）：
 ```
-stock_count: 43          -- 有43只银行股票
+stock_count: 43          -- 该日期有数据的银行股票数（来自stock_metric_data_raw）
 total_value: 42,408,691  -- 这43只股票的EEE值总和
 avg_value: 986,248       -- 平均值 = 42408691 / 43
 max_value: 5,140,764     -- 最高的股票值
@@ -391,6 +391,13 @@ min_value: 44,659        -- 最低的股票值
 median_value: 441,832    -- 中间值
 top10_sum: 26,908,249    -- 排名前10的股票值总和
 ```
+
+**⚠️ 注意：stock_count 的含义和局限性**
+
+- `concept_daily_summary.stock_count` = 该日期有指标数据的股票数（可能 < 实际概念包含的股票数）
+- 实际概念包含的所有股票数 = `stock_concepts` 表中该概念的股票数（静态主数据）
+- 查询时应该优先使用 `stock_concepts` 中的数据来获取完整的概念-股票关系
+- 原因：CSV 导入数据可能不完整，某些股票在某些日期可能没有数据，导致 `stock_count` 偏小
 
 **计算SQL**（来自 `compute_service.py` 第90-128行）：
 ```sql
@@ -757,6 +764,33 @@ WHERE r.concept_id = (SELECT id FROM concepts WHERE concept_name = '银行')
 ORDER BY r.rank ASC
 LIMIT 5;
 ```
+
+### 查询5：正确获取概念的实际股票数（重要）
+
+**需求**：获取"银行"概念的实际包含股票数（而不是某日期的有数据股票数）
+
+```sql
+-- ❌ 错误做法：使用 concept_daily_summary.stock_count
+-- 这会得到该日期有数据的股票数，可能不完整
+SELECT COUNT(*) as stock_count
+FROM concept_daily_summary
+WHERE concept_id = (SELECT id FROM concepts WHERE concept_name = '银行')
+  AND trade_date = '2025-11-04'
+  AND metric_code = 'EEE';
+-- 结果: 43（该日期有数据的股票数）
+
+-- ✅ 正确做法：从 stock_concepts 主数据表查询
+SELECT COUNT(*) as actual_stock_count
+FROM stock_concepts
+WHERE concept_id = (SELECT id FROM concepts WHERE concept_name = '银行');
+-- 结果: 86（概念实际包含的所有股票数，不变）
+```
+
+**说明**：
+- `concept_daily_summary.stock_count` 是导入数据时计算的，只包含有数据的股票
+- 实际的概念-股票关系存储在 `stock_concepts` 表（主数据）
+- 当需要显示"概念包含股票数"时，应从 `stock_concepts` 查询
+- 当需要显示"该日期有数据的股票数"时，可用 `concept_daily_summary.stock_count`
 
 ---
 
