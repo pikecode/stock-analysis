@@ -234,6 +234,12 @@ def get_stock_by_code(db: Session, code: str):
 - Stock ↔ Concepts (many-to-many via concept_stocks)
 - Role ↔ Permissions (many-to-many via role_permissions)
 
+⚠️ **详细说明**：见 `.spec-workflow/database-schema.md`
+- 所有表的完整字段定义和含义
+- 数据流向和计算逻辑（排名、汇总）
+- 关键概念解释（trade_value、概念vs行业等）
+- 常见查询示例
+
 ## Important Configuration Notes
 
 ### Frontend Proxy
