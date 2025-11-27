@@ -218,6 +218,9 @@ class ConceptRankedItem(BaseModel):
     trade_value: Optional[int] = None
     rank: Optional[int] = None
     percentile: Optional[float] = None
+    concept_total_value: Optional[int] = None
+    concept_stock_count: Optional[int] = None
+    concept_avg_value: Optional[float] = None
 
 
 class StockConceptsRankedResponse(BaseModel):

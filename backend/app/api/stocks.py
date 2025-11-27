@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.stock import Stock, Concept, StockConcept, ConceptStockDailyRank
+from app.models.stock import Stock, Concept, StockConcept, ConceptStockDailyRank, ConceptDailySummary
 from app.schemas.stock import (
     StockResponse,
     StockListResponse,
@@ -159,8 +159,9 @@ async def get_stock_concepts_ranked(
             detail=f"Stock {stock_code} not found",
         )
 
-    # Get stock concepts with ranking data
-    # Query: JOIN stock_concepts with ConceptStockDailyRank to get trade_value
+    # Get stock concepts with ranking data and daily summary
+    # Query: JOIN stock_concepts with ConceptStockDailyRank (for rank/percentile)
+    #        LEFT OUTER JOIN ConceptDailySummary (for concept totals)
     results = (
         db.query(
             Concept.id,
@@ -169,6 +170,9 @@ async def get_stock_concepts_ranked(
             ConceptStockDailyRank.trade_value,
             ConceptStockDailyRank.rank,
             ConceptStockDailyRank.percentile,
+            ConceptDailySummary.total_value,
+            ConceptDailySummary.stock_count,
+            ConceptDailySummary.avg_value,
         )
         .join(
             StockConcept,
@@ -180,6 +184,12 @@ async def get_stock_concepts_ranked(
             & (ConceptStockDailyRank.stock_code == stock_code)
             & (ConceptStockDailyRank.trade_date == trade_date)
             & (ConceptStockDailyRank.metric_code == metric_code),
+        )
+        .outerjoin(
+            ConceptDailySummary,
+            (ConceptDailySummary.concept_id == Concept.id)
+            & (ConceptDailySummary.trade_date == trade_date)
+            & (ConceptDailySummary.metric_code == metric_code),
         )
         .filter(StockConcept.stock_code == stock_code)
         .order_by(ConceptStockDailyRank.trade_value.desc())
@@ -195,6 +205,9 @@ async def get_stock_concepts_ranked(
             trade_value=r[3],
             rank=r[4],
             percentile=float(r[5]) if r[5] else None,
+            concept_total_value=r[6],
+            concept_stock_count=r[7],
+            concept_avg_value=float(r[8]) if r[8] else None,
         )
         for r in results
     ]

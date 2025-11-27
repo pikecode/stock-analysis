@@ -315,13 +315,47 @@ const handleLastWeek = () => {
                 <span v-else>-</span>
               </template>
             </el-table-column>
+            <el-table-column prop="concept_total_value" label="概念总交易量" min-width="140" align="center">
+              <template #default="{ row }">
+                <span v-if="row.concept_total_value">
+                  {{ formatTradeValue(row.concept_total_value) }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="concept_stock_count" label="概念股票数" width="110" align="center">
+              <template #default="{ row }">
+                <span v-if="row.concept_stock_count">
+                  <el-tag>{{ row.concept_stock_count }}</el-tag>
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="concept_avg_value" label="概念平均交易量" min-width="140" align="center">
+              <template #default="{ row }">
+                <span v-if="row.concept_avg_value">
+                  {{ formatTradeValue(row.concept_avg_value) }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
           </el-table>
 
           <!-- 数据说明 -->
           <div class="data-tips">
             <el-alert type="info" :closable="false">
               <template #title>
-                数据说明：表格按交易量（{{ metricCode }}）从高到低排序，排名表示该概念在同日期的排名位次，百分位表示该概念在所有概念中的相对排名。
+                <div class="tips-content">
+                  <p><strong>数据说明：</strong></p>
+                  <ul>
+                    <li><strong>交易量：</strong>该股票在该概念下的 {{ metricCode }} 指标值</li>
+                    <li><strong>排名：</strong>该概念在该股票、该日期、该指标下的排名位次</li>
+                    <li><strong>百分位：</strong>该概念在所有概念中的相对排名（0-1）</li>
+                    <li><strong>概念总交易量：</strong>该概念在该日期、该指标下所有股票的总交易量</li>
+                    <li><strong>概念股票数：</strong>该概念包含的股票数量</li>
+                    <li><strong>概念平均交易量：</strong>该概念在该日期、该指标下的平均交易量（总交易量 ÷ 股票数）</li>
+                  </ul>
+                </div>
               </template>
             </el-alert>
           </div>
@@ -496,6 +530,26 @@ const handleLastWeek = () => {
 
 .data-tips {
   margin-top: 16px;
+}
+
+.tips-content {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #606266;
+}
+
+.tips-content p {
+  margin: 0 0 8px 0;
+}
+
+.tips-content ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.tips-content li {
+  margin: 4px 0;
 }
 
 .empty-state {
