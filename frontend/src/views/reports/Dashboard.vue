@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ref, computed, watch } from 'vue'
+import { Search, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { reportApi, conceptApi } from '@/api'
 import dayjs from 'dayjs'
@@ -51,6 +51,21 @@ const selectedDate = ref(dayjs().format('YYYY-MM-DD'))
 const metricCode = ref('EEE')
 const queryResult = ref<QueryResult | null>(null)
 const hasSearched = ref(false)
+
+// 当前选中的概念
+const selectedConcept = ref<ConceptRankedItem | null>(null)
+
+// 移动端折叠面板展开的概念 ID
+const expandedConceptId = ref<number | null>(null)
+
+// 图表日期范围
+const chartStartDate = ref('')
+const chartEndDate = ref('')
+const chartDateRange = ref<string[]>([])
+
+// 控制图表显示
+const showRankingChart = ref(false)
+const showDailyTradeChart = ref(false)
 
 // 度量指标选项
 const metricOptions = [
@@ -233,45 +248,64 @@ const loadMoreStocks = async (concept: ConceptRankedItem) => {
   }
 }
 
-// 切换排名图表显示
-const toggleChart = (concept: ConceptRankedItem) => {
-  concept.showChart = !concept.showChart
+// 选择概念（新的三步骤布局）
+const selectConcept = async (concept: ConceptRankedItem) => {
+  selectedConcept.value = concept
+  expandedConceptId.value = concept.id
 
-  // 初始化日期范围：默认最近30天
-  if (concept.showChart && !concept.chartStartDate) {
+  // 初始化图表日期范围：默认最近30天
+  if (!chartStartDate.value) {
     const endDate = dayjs(selectedDate.value)
     const startDate = endDate.subtract(30, 'days')
-    const startDateStr = startDate.format('YYYY-MM-DD')
-    const endDateStr = endDate.format('YYYY-MM-DD')
-    concept.chartStartDate = startDateStr
-    concept.chartEndDate = endDateStr
-    // 确保数组是新创建的，这样 Vue 才能检测到变化
-    concept.chartDateRange = [startDateStr, endDateStr]
-    console.log('初始化图表日期范围:', {
-      startDate: startDateStr,
-      endDate: endDateStr,
-      chartDateRange: concept.chartDateRange
-    })
+    chartStartDate.value = startDate.format('YYYY-MM-DD')
+    chartEndDate.value = endDate.format('YYYY-MM-DD')
+    chartDateRange.value = [chartStartDate.value, chartEndDate.value]
   }
+
+  // 默认显示排名趋势图
+  showRankingChart.value = true
+  showDailyTradeChart.value = false
+
+  // 加载该概念下的股票列表
+  if (!concept.stocks) {
+    await loadConceptStocks(concept)
+  }
+
+  console.log('已选择概念:', {
+    conceptId: concept.id,
+    conceptName: concept.concept_name,
+    chartDateRange: chartDateRange.value
+  })
 }
 
-// 更新图表日期范围
-const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[] | null) => {
+// 更新图表日期范围（新版本）
+const updateChartDateRange = (dateRange: string[] | null) => {
   console.log('日期范围改变事件:', { dateRange })
   if (dateRange && dateRange.length === 2) {
-    concept.chartStartDate = dateRange[0]
-    concept.chartEndDate = dateRange[1]
-    // 确保更新是响应式的
-    concept.chartDateRange = [...dateRange]
+    chartStartDate.value = dateRange[0]
+    chartEndDate.value = dateRange[1]
+    chartDateRange.value = [...dateRange]
     console.log('已更新图表日期范围:', {
-      startDate: concept.chartStartDate,
-      endDate: concept.chartEndDate,
-      chartDateRange: concept.chartDateRange
+      startDate: chartStartDate.value,
+      endDate: chartEndDate.value,
+      chartDateRange: chartDateRange.value
     })
   } else {
     console.log('日期范围为空或格式不正确:', dateRange)
   }
 }
+
+// 旧版本函数已移除，现在使用新的三步骤布局
+
+// 监听移动端折叠面板的展开
+watch(expandedConceptId, (newId) => {
+  if (newId && queryResult.value) {
+    const concept = queryResult.value.concepts.find(c => c.id === newId)
+    if (concept) {
+      selectConcept(concept)
+    }
+  }
+})
 </script>
 
 <template>
@@ -402,197 +436,308 @@ const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[] | 
           </div>
         </div>
 
-        <!-- 概念列表 -->
-        <div v-if="queryResult.concepts.length > 0" class="concepts-section">
-          <h3>关联概念列表</h3>
-          <el-table
-            :data="queryResult.concepts"
-            stripe
-            style="width: 100%"
-          >
-            <el-table-column label="操作" width="50" align="center">
-              <template #default="{ row }">
-                <el-button
-                  link
-                  type="primary"
-                  :icon="row.isExpanded ? 'ArrowDown' : 'ArrowRight'"
-                  @click.stop="toggleExpand(row)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="concept_name" label="概念名称" min-width="150" />
-            <el-table-column prop="rank" label="排名" width="100" align="center">
-              <template #default="{ row }">
-                <span v-if="row.rank">
-                  <el-tag v-if="row.rank <= 3" type="danger">#{{ row.rank }}</el-tag>
-                  <el-tag v-else type="info">#{{ row.rank }}</el-tag>
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="concept_total_value"
-              label="概念总交易量"
-              min-width="140"
-              align="center"
-            >
-              <template #default="{ row }">
-                <span v-if="row.concept_total_value" class="concept-total-value-highlight">
-                  {{ formatTradeValue(row.concept_total_value) }}
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="concept_stock_count" label="概念股票数" width="110" align="center">
-              <template #default="{ row }">
-                <span v-if="row.concept_stock_count">
-                  <el-tag>{{ row.concept_stock_count }}</el-tag>
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="concept_avg_value" label="概念平均交易量" min-width="140" align="center">
-              <template #default="{ row }">
-                <span v-if="row.concept_avg_value">
-                  {{ formatTradeValue(row.concept_avg_value) }}
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-          </el-table>
+        <!-- 新的三步骤布局：概念列表 + 概念详情 -->
+        <div v-if="queryResult.concepts.length > 0" class="concepts-section-new">
+          <!-- 桌面端：左右分栏布局 -->
+          <el-row :gutter="20" class="desktop-layout">
+            <!-- 第二步：概念列表（左侧） -->
+            <el-col :xs="24" :sm="24" :md="10" :lg="8">
+              <el-card class="concept-list-card" shadow="never">
+                <template #header>
+                  <div class="section-header">
+                    <h3>📋 关联概念列表</h3>
+                    <el-tag type="info" size="small">共 {{ queryResult.concepts.length }} 个</el-tag>
+                  </div>
+                </template>
 
-          <!-- 展开行内容 -->
-          <div
-            v-for="concept in queryResult.concepts.filter(c => c.isExpanded)"
-            :key="concept.id"
-            class="stock-list-wrapper"
-          >
-            <div class="stock-list-container">
-              <div v-if="concept.stocksLoading" class="loading">
-                <el-skeleton :rows="3" animated />
-              </div>
-              <div v-else-if="concept.stocks && concept.stocks.length > 0" class="stocks-list">
-                <h4>{{ concept.concept_name }} - 股票列表</h4>
-                <el-table :data="concept.stocks" stripe style="width: 100%">
-                  <el-table-column prop="stock_code" label="股票代码" width="120" />
-                  <el-table-column prop="stock_name" label="股票名称" min-width="150" />
-                  <el-table-column label="交易量" min-width="140" align="right">
-                    <template #default="{ row }">
-                      <span v-if="row.trade_value" class="trade-value-highlight">
-                        {{ formatTradeValue(row.trade_value) }}
+                <div class="concept-list">
+                  <div
+                    v-for="concept in queryResult.concepts"
+                    :key="concept.id"
+                    class="concept-item"
+                    :class="{ active: selectedConcept?.id === concept.id }"
+                    @click="selectConcept(concept)"
+                  >
+                    <div class="concept-item-header">
+                      <div class="concept-name">
+                        <el-icon class="icon-check" v-if="selectedConcept?.id === concept.id">
+                          <Check />
+                        </el-icon>
+                        {{ concept.concept_name }}
+                      </div>
+                      <el-tag v-if="concept.rank" :type="concept.rank <= 3 ? 'danger' : 'info'" size="small">
+                        排名 #{{ concept.rank }}
+                      </el-tag>
+                    </div>
+                    <div class="concept-item-meta">
+                      <span class="meta-item">
+                        总交易量: {{ formatTradeValue(concept.concept_total_value) }}
                       </span>
+                      <span class="meta-item">
+                        股票数: {{ concept.concept_stock_count }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+
+            <!-- 第三步：概念详情区域（右侧） -->
+            <el-col :xs="24" :sm="24" :md="14" :lg="16">
+              <el-card v-if="selectedConcept" class="concept-detail-card" shadow="never">
+                <template #header>
+                  <div class="section-header">
+                    <h3>📊 {{ selectedConcept.concept_name }} - 详细信息</h3>
+                    <el-button type="primary" size="small" @click="selectedConcept = null">
+                      关闭
+                    </el-button>
+                  </div>
+                </template>
+
+                <!-- 概念基本信息 -->
+                <div class="concept-basic-info">
+                  <el-descriptions :column="2" border size="small">
+                    <el-descriptions-item label="概念名称">
+                      {{ selectedConcept.concept_name }}
+                    </el-descriptions-item>
+                    <el-descriptions-item label="排名">
+                      <el-tag v-if="selectedConcept.rank" :type="selectedConcept.rank <= 3 ? 'danger' : 'info'">
+                        #{{ selectedConcept.rank }}
+                      </el-tag>
                       <span v-else>-</span>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <div v-if="concept.stocks.length < concept.stocksTotal" class="load-more-btn">
-                  <el-button
-                    type="primary"
-                    link
-                    @click="loadMoreStocks(concept)"
-                  >
-                    加载更多（已加载 {{ concept.stocks.length }}/{{ concept.stocksTotal }} 个股票）
-                  </el-button>
-                </div>
-                <div v-else class="all-loaded">
-                  已全部加载 {{ concept.stocks.length }} 个股票
-                </div>
-              </div>
-              <div v-else class="empty-stocks">
-                暂无股票数据
-              </div>
-
-              <!-- 排名图表区域 -->
-              <div v-if="concept.stocks && concept.stocks.length > 0" class="chart-section">
-                <div class="chart-header">
-                  <el-button
-                    type="primary"
-                    link
-                    @click="toggleChart(concept)"
-                  >
-                    {{ concept.showChart ? '隐藏' : '显示' }} 排名趋势图
-                  </el-button>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="概念总交易量">
+                      {{ formatTradeValue(selectedConcept.concept_total_value) }}
+                    </el-descriptions-item>
+                    <el-descriptions-item label="概念股票数">
+                      {{ selectedConcept.concept_stock_count }}
+                    </el-descriptions-item>
+                    <el-descriptions-item label="概念平均交易量" :span="2">
+                      {{ formatTradeValue(selectedConcept.concept_avg_value) }}
+                    </el-descriptions-item>
+                  </el-descriptions>
                 </div>
 
-                <!-- 图表显示区域 -->
-                <div v-if="concept.showChart" class="chart-container">
-                  <div class="date-range-selector">
-                    <label>日期范围：</label>
+                <!-- 股票列表 -->
+                <div class="concept-stocks-section" style="margin-top: 20px;">
+                  <h4 style="margin-bottom: 12px;">概念下的股票列表</h4>
+                  <div v-if="selectedConcept.stocksLoading" class="loading">
+                    <el-skeleton :rows="3" animated />
+                  </div>
+                  <div v-else-if="selectedConcept.stocks && selectedConcept.stocks.length > 0">
+                    <el-table :data="selectedConcept.stocks" stripe size="small" max-height="300">
+                      <el-table-column prop="stock_code" label="股票代码" width="100" />
+                      <el-table-column prop="stock_name" label="股票名称" min-width="120" />
+                      <el-table-column label="交易量" min-width="120" align="right">
+                        <template #default="{ row }">
+                          <span v-if="row.trade_value" class="trade-value-highlight">
+                            {{ formatTradeValue(row.trade_value) }}
+                          </span>
+                          <span v-else>-</span>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                    <div v-if="selectedConcept.stocks.length < selectedConcept.stocksTotal" class="load-more-btn">
+                      <el-button type="primary" link size="small" @click="loadMoreStocks(selectedConcept)">
+                        加载更多（{{ selectedConcept.stocks.length }}/{{ selectedConcept.stocksTotal }}）
+                      </el-button>
+                    </div>
+                  </div>
+                  <div v-else class="empty-stocks">
+                    暂无股票数据
+                  </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="concept-charts-section" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #ebeef5;">
+                  <h4 style="margin-bottom: 12px;">趋势图表</h4>
+
+                  <!-- 日期范围选择器 -->
+                  <div class="date-range-selector" style="margin-bottom: 16px;">
+                    <label style="font-size: 13px; color: #606266; margin-right: 8px;">日期范围：</label>
                     <el-date-picker
-                      :model-value="concept.chartDateRange"
+                      v-model="chartDateRange"
                       type="daterange"
                       range-separator="至"
                       start-placeholder="开始日期"
                       end-placeholder="结束日期"
                       format="YYYY-MM-DD"
                       value-format="YYYY-MM-DD"
+                      size="small"
                       clearable
-                      @update:model-value="(dateRange: any) => {
-                        console.log('@update:model-value 触发:', dateRange)
-                        updateChartDateRange(concept, dateRange)
-                      }"
+                      @update:model-value="updateChartDateRange"
                     />
-                    <!-- 调试：显示当前的 chartDateRange 值 -->
-                    <span class="debug-text" style="margin-left: 8px; font-size: 12px; color: #909399;">
-                      ({{ concept.chartDateRange?.join(' ~ ') || '未初始化' }})
-                    </span>
                   </div>
 
-                  <StockRankingChart
-                    v-if="queryResult && concept.chartStartDate && concept.chartEndDate"
-                    :concept-id="concept.id"
-                    :concept-name="concept.concept_name"
-                    :stock-code="queryResult.stock_code"
-                    :stock-name="queryResult.stock_name"
-                    :metric-code="metricCode"
-                    :start-date="concept.chartStartDate"
-                    :end-date="concept.chartEndDate"
-                  />
+                  <!-- 图表切换按钮 -->
+                  <div class="chart-toggles" style="margin-bottom: 12px;">
+                    <el-checkbox v-model="showRankingChart" label="显示排名趋势图" border size="small" />
+                    <el-checkbox v-model="showDailyTradeChart" label="显示每日交易总和" border size="small" style="margin-left: 12px;" />
+                  </div>
 
-                  <!-- 每日交易总和图表切换按钮 -->
-                  <div class="daily-trade-chart-section" style="margin-top: 16px; border-top: 1px solid #ebeef5; padding-top: 12px;">
-                    <div class="chart-header">
+                  <!-- 排名趋势图 -->
+                  <div v-if="showRankingChart && queryResult && chartStartDate && chartEndDate" class="chart-wrapper">
+                    <StockRankingChart
+                      :concept-id="selectedConcept.id"
+                      :concept-name="selectedConcept.concept_name"
+                      :stock-code="queryResult.stock_code"
+                      :stock-name="queryResult.stock_name"
+                      :metric-code="metricCode"
+                      :start-date="chartStartDate"
+                      :end-date="chartEndDate"
+                    />
+                  </div>
+
+                  <!-- 每日交易总和图表 -->
+                  <div v-if="showDailyTradeChart && queryResult && chartStartDate && chartEndDate" class="chart-wrapper" style="margin-top: 16px;">
+                    <ConceptDailyTradeChart
+                      :concept-id="selectedConcept.id"
+                      :concept-name="selectedConcept.concept_name"
+                      :metric-code="metricCode"
+                      :start-date="chartStartDate"
+                      :end-date="chartEndDate"
+                    />
+                  </div>
+                </div>
+              </el-card>
+
+              <!-- 未选择概念时的提示 -->
+              <el-card v-else class="concept-detail-placeholder" shadow="never">
+                <el-empty description="请从左侧选择一个概念查看详细信息" />
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- 移动端：折叠面板布局 -->
+          <div class="mobile-layout">
+            <el-card shadow="never">
+              <template #header>
+                <div class="section-header">
+                  <h3>📋 关联概念列表</h3>
+                  <el-tag type="info" size="small">共 {{ queryResult.concepts.length }} 个</el-tag>
+                </div>
+              </template>
+
+              <el-collapse v-model="expandedConceptId" accordion>
+                <el-collapse-item
+                  v-for="concept in queryResult.concepts"
+                  :key="concept.id"
+                  :name="concept.id"
+                >
+                  <template #title>
+                    <div class="mobile-concept-header">
+                      <div class="mobile-concept-title">
+                        <span class="concept-name-text">{{ concept.concept_name }}</span>
+                        <el-tag v-if="concept.rank" :type="concept.rank <= 3 ? 'danger' : 'info'" size="small">
+                          #{{ concept.rank }}
+                        </el-tag>
+                      </div>
+                      <div class="mobile-concept-meta">
+                        <span>总交易: {{ formatTradeValue(concept.concept_total_value) }}</span>
+                        <span>股票数: {{ concept.concept_stock_count }}</span>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 折叠面板内容 -->
+                  <div class="mobile-concept-detail">
+                    <!-- 概念基本信息 -->
+                    <el-descriptions :column="1" border size="small" style="margin-bottom: 16px;">
+                      <el-descriptions-item label="概念名称">
+                        {{ concept.concept_name }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="排名">
+                        <el-tag v-if="concept.rank" :type="concept.rank <= 3 ? 'danger' : 'info'">
+                          #{{ concept.rank }}
+                        </el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="概念总交易量">
+                        {{ formatTradeValue(concept.concept_total_value) }}
+                      </el-descriptions-item>
+                      <el-descriptions-item label="概念股票数">
+                        {{ concept.concept_stock_count }}
+                      </el-descriptions-item>
+                    </el-descriptions>
+
+                    <!-- 股票列表 -->
+                    <div v-if="concept.stocks && concept.stocks.length > 0" style="margin-bottom: 16px;">
+                      <h4 style="font-size: 13px; margin-bottom: 8px;">股票列表</h4>
+                      <div
+                        v-for="stock in concept.stocks.slice(0, 5)"
+                        :key="stock.stock_code"
+                        class="mobile-stock-item"
+                      >
+                        <div class="stock-info">
+                          <span class="stock-code">{{ stock.stock_code }}</span>
+                          <span class="stock-name">{{ stock.stock_name }}</span>
+                        </div>
+                        <div class="stock-value">
+                          {{ formatTradeValue(stock.trade_value) }}
+                        </div>
+                      </div>
                       <el-button
+                        v-if="!concept.stocks || concept.stocks.length === 0"
                         type="primary"
                         link
-                        @click="concept.showDailyTradeChart = !concept.showDailyTradeChart"
+                        size="small"
+                        @click.stop="loadConceptStocks(concept)"
                       >
-                        {{ concept.showDailyTradeChart ? '隐藏' : '显示' }} 每日交易总和
+                        加载股票列表
                       </el-button>
                     </div>
 
-                    <!-- 每日交易总和图表显示区域 -->
-                    <div v-if="concept.showDailyTradeChart" class="daily-trade-chart-container" style="margin-top: 12px;">
-                      <ConceptDailyTradeChart
-                        v-if="queryResult && concept.chartStartDate && concept.chartEndDate"
-                        :concept-id="concept.id"
-                        :concept-name="concept.concept_name"
-                        :metric-code="metricCode"
-                        :start-date="concept.chartStartDate"
-                        :end-date="concept.chartEndDate"
+                    <!-- 图表区域 -->
+                    <div class="mobile-charts">
+                      <h4 style="font-size: 13px; margin-bottom: 8px;">趋势图表</h4>
+
+                      <!-- 日期范围选择 -->
+                      <el-date-picker
+                        v-model="chartDateRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始"
+                        end-placeholder="结束"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                        size="small"
+                        style="width: 100%; margin-bottom: 12px;"
+                        @update:model-value="updateChartDateRange"
                       />
+
+                      <!-- 图表切换 -->
+                      <div style="margin-bottom: 12px;">
+                        <el-checkbox v-model="showRankingChart" size="small">排名趋势</el-checkbox>
+                        <el-checkbox v-model="showDailyTradeChart" size="small" style="margin-left: 12px;">交易总和</el-checkbox>
+                      </div>
+
+                      <!-- 排名趋势图 -->
+                      <div v-if="showRankingChart && queryResult && chartStartDate && chartEndDate" style="margin-bottom: 12px;">
+                        <StockRankingChart
+                          :concept-id="concept.id"
+                          :concept-name="concept.concept_name"
+                          :stock-code="queryResult.stock_code"
+                          :stock-name="queryResult.stock_name"
+                          :metric-code="metricCode"
+                          :start-date="chartStartDate"
+                          :end-date="chartEndDate"
+                        />
+                      </div>
+
+                      <!-- 每日交易总和图表 -->
+                      <div v-if="showDailyTradeChart && queryResult && chartStartDate && chartEndDate">
+                        <ConceptDailyTradeChart
+                          :concept-id="concept.id"
+                          :concept-name="concept.concept_name"
+                          :metric-code="metricCode"
+                          :start-date="chartStartDate"
+                          :end-date="chartEndDate"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 数据说明 -->
-          <div class="data-tips">
-            <el-alert type="info" :closable="false">
-              <template #title>
-                <div class="tips-content">
-                  <p><strong>数据说明：</strong></p>
-                  <ul>
-                    <li><strong>排名：</strong>该概念在该股票、该日期、该指标下的排名位次</li>
-                    <li><strong>概念总交易量：</strong>该概念在该日期、该指标下所有股票的总交易量</li>
-                    <li><strong>概念股票数：</strong>该概念包含的股票数量</li>
-                    <li><strong>概念平均交易量：</strong>该概念在该日期、该指标下的平均交易量（总交易量 ÷ 股票数）</li>
-                  </ul>
-                </div>
-              </template>
-            </el-alert>
+                </el-collapse-item>
+              </el-collapse>
+            </el-card>
           </div>
         </div>
 
@@ -988,5 +1133,263 @@ const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[] | 
 
 :deep(.stock-list-container .el-table__row:hover > td) {
   background-color: #f5f7fa !important;
+}
+
+/* 新的三步骤布局样式 */
+.concepts-section-new {
+  margin-top: 20px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+/* 概念列表卡片 */
+.concept-list-card {
+  height: 100%;
+}
+
+.concept-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.concept-item {
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background-color: #fff;
+}
+
+.concept-item:hover {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.concept-item.active {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.concept-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.concept-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-check {
+  color: #67c23a;
+  font-size: 16px;
+}
+
+.concept-item-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+}
+
+/* 概念详情卡片 */
+.concept-detail-card {
+  height: 100%;
+  min-height: 600px;
+}
+
+.concept-detail-placeholder {
+  height: 100%;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.concept-basic-info {
+  margin-bottom: 16px;
+}
+
+.concept-stocks-section {
+  margin-top: 20px;
+}
+
+.concept-stocks-section h4,
+.concept-charts-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.chart-toggles {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-wrapper {
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+/* 桌面端和移动端布局切换 */
+.desktop-layout {
+  display: flex;
+}
+
+.mobile-layout {
+  display: none;
+}
+
+/* 移动端折叠面板样式 */
+.mobile-concept-header {
+  width: 100%;
+  padding: 4px 0;
+}
+
+.mobile-concept-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.concept-name-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  flex: 1;
+}
+
+.mobile-concept-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.mobile-concept-detail {
+  padding: 12px 0;
+}
+
+.mobile-stock-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.stock-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stock-code {
+  font-size: 12px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.stock-name {
+  font-size: 12px;
+  color: #606266;
+}
+
+.stock-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #f56c6c;
+}
+
+.mobile-charts {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  /* 隐藏桌面端布局 */
+  .desktop-layout {
+    display: none !important;
+  }
+
+  /* 显示移动端布局 */
+  .mobile-layout {
+    display: block;
+  }
+
+  .concept-list {
+    max-height: 400px;
+  }
+
+  .concept-detail-card,
+  .concept-detail-placeholder {
+    min-height: 400px;
+  }
+
+  .chart-toggles {
+    flex-direction: column;
+  }
+
+  .chart-toggles :deep(.el-checkbox) {
+    margin-left: 0 !important;
+    margin-top: 8px;
+  }
+
+  /* 移动端图表优化 */
+  .mobile-charts :deep(.chart-wrapper) {
+    padding: 8px;
+  }
+
+  .mobile-charts :deep(.el-checkbox) {
+    display: block;
+    margin-bottom: 8px;
+  }
+}
+
+@media (min-width: 769px) {
+  /* 确保桌面端显示正确 */
+  .desktop-layout {
+    display: flex !important;
+  }
+
+  .mobile-layout {
+    display: none !important;
+  }
 }
 </style>
