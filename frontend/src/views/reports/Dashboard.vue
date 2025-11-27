@@ -12,6 +12,9 @@ interface ConceptRankedItem {
   trade_value?: number
   rank?: number
   percentile?: number
+  concept_total_value?: number
+  concept_stock_count?: number
+  concept_avg_value?: number
 }
 
 interface QueryResult {
