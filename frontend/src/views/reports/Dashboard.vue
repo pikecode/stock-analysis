@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { reportApi, conceptApi } from '@/api'
 import dayjs from 'dayjs'
 import StockRankingChart from '@/components/StockRankingChart.vue'
+import ConceptDailyTradeChart from '@/components/ConceptDailyTradeChart.vue'
 
 interface ConceptRankedItem {
   id: number
@@ -23,6 +24,8 @@ interface ConceptRankedItem {
   showChart?: boolean
   chartStartDate?: string
   chartEndDate?: string
+  chartDateRange?: string[]
+  showDailyTradeChart?: boolean
 }
 
 interface StockItem {
@@ -238,16 +241,35 @@ const toggleChart = (concept: ConceptRankedItem) => {
   if (concept.showChart && !concept.chartStartDate) {
     const endDate = dayjs(selectedDate.value)
     const startDate = endDate.subtract(30, 'days')
-    concept.chartStartDate = startDate.format('YYYY-MM-DD')
-    concept.chartEndDate = endDate.format('YYYY-MM-DD')
+    const startDateStr = startDate.format('YYYY-MM-DD')
+    const endDateStr = endDate.format('YYYY-MM-DD')
+    concept.chartStartDate = startDateStr
+    concept.chartEndDate = endDateStr
+    // 确保数组是新创建的，这样 Vue 才能检测到变化
+    concept.chartDateRange = [startDateStr, endDateStr]
+    console.log('初始化图表日期范围:', {
+      startDate: startDateStr,
+      endDate: endDateStr,
+      chartDateRange: concept.chartDateRange
+    })
   }
 }
 
 // 更新图表日期范围
-const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[]) => {
+const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[] | null) => {
+  console.log('日期范围改变事件:', { dateRange })
   if (dateRange && dateRange.length === 2) {
     concept.chartStartDate = dateRange[0]
     concept.chartEndDate = dateRange[1]
+    // 确保更新是响应式的
+    concept.chartDateRange = [...dateRange]
+    console.log('已更新图表日期范围:', {
+      startDate: concept.chartStartDate,
+      endDate: concept.chartEndDate,
+      chartDateRange: concept.chartDateRange
+    })
+  } else {
+    console.log('日期范围为空或格式不正确:', dateRange)
   }
 }
 </script>
@@ -497,15 +519,23 @@ const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[]) =
                   <div class="date-range-selector">
                     <label>日期范围：</label>
                     <el-date-picker
-                      :model-value="concept.chartStartDate && concept.chartEndDate ? [concept.chartStartDate, concept.chartEndDate] : []"
+                      :model-value="concept.chartDateRange"
                       type="daterange"
                       range-separator="至"
                       start-placeholder="开始日期"
                       end-placeholder="结束日期"
                       format="YYYY-MM-DD"
                       value-format="YYYY-MM-DD"
-                      @change="(dateRange) => updateChartDateRange(concept, dateRange as string[])"
+                      clearable
+                      @update:model-value="(dateRange: any) => {
+                        console.log('@update:model-value 触发:', dateRange)
+                        updateChartDateRange(concept, dateRange)
+                      }"
                     />
+                    <!-- 调试：显示当前的 chartDateRange 值 -->
+                    <span class="debug-text" style="margin-left: 8px; font-size: 12px; color: #909399;">
+                      ({{ concept.chartDateRange?.join(' ~ ') || '未初始化' }})
+                    </span>
                   </div>
 
                   <StockRankingChart
@@ -518,6 +548,31 @@ const updateChartDateRange = (concept: ConceptRankedItem, dateRange: string[]) =
                     :start-date="concept.chartStartDate"
                     :end-date="concept.chartEndDate"
                   />
+
+                  <!-- 每日交易总和图表切换按钮 -->
+                  <div class="daily-trade-chart-section" style="margin-top: 16px; border-top: 1px solid #ebeef5; padding-top: 12px;">
+                    <div class="chart-header">
+                      <el-button
+                        type="primary"
+                        link
+                        @click="concept.showDailyTradeChart = !concept.showDailyTradeChart"
+                      >
+                        {{ concept.showDailyTradeChart ? '隐藏' : '显示' }} 每日交易总和
+                      </el-button>
+                    </div>
+
+                    <!-- 每日交易总和图表显示区域 -->
+                    <div v-if="concept.showDailyTradeChart" class="daily-trade-chart-container" style="margin-top: 12px;">
+                      <ConceptDailyTradeChart
+                        v-if="queryResult && concept.chartStartDate && concept.chartEndDate"
+                        :concept-id="concept.id"
+                        :concept-name="concept.concept_name"
+                        :metric-code="metricCode"
+                        :start-date="concept.chartStartDate"
+                        :end-date="concept.chartEndDate"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

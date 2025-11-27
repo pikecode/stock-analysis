@@ -201,3 +201,59 @@ async def get_stock_rank_history(
             for h in history
         ],
     }
+
+
+@router.get("/{concept_id}/daily-trade-summary")
+async def get_concept_daily_trade_summary(
+    concept_id: int,
+    start_date: date = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="End date (YYYY-MM-DD)"),
+    metric_code: str = Query("TTV", description="Metric code (e.g., TTV, EEE)"),
+    db: Session = Depends(get_db),
+):
+    """Get concept daily trade value summary over a date range.
+    
+    Returns the sum of trade values for all stocks in the concept for each day.
+    """
+    # Verify concept exists
+    concept = db.query(Concept).filter(Concept.id == concept_id).first()
+
+    if not concept:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Concept {concept_id} not found",
+        )
+
+    # Get daily trade value summary
+    daily_summary = (
+        db.query(
+            ConceptStockDailyRank.trade_date,
+            func.sum(ConceptStockDailyRank.trade_value).label("total_trade_value"),
+            func.count(ConceptStockDailyRank.stock_code).label("stock_count"),
+        )
+        .filter(
+            (ConceptStockDailyRank.concept_id == concept_id)
+            & (ConceptStockDailyRank.metric_code == metric_code)
+            & (ConceptStockDailyRank.trade_date >= start_date)
+            & (ConceptStockDailyRank.trade_date <= end_date)
+        )
+        .group_by(ConceptStockDailyRank.trade_date)
+        .order_by(ConceptStockDailyRank.trade_date.asc())
+        .all()
+    )
+
+    return {
+        "concept_id": concept.id,
+        "concept_name": concept.concept_name,
+        "metric_code": metric_code,
+        "start_date": start_date,
+        "end_date": end_date,
+        "daily_summary": [
+            {
+                "trade_date": s[0],
+                "total_trade_value": s[1],
+                "stock_count": s[2],
+            }
+            for s in daily_summary
+        ],
+    }

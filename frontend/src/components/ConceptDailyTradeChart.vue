@@ -3,17 +3,15 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import VChart from 'vue-echarts'
 
-interface RankingData {
+interface DailySummary {
   trade_date: string
-  rank: number | null
-  trade_value: number | null
+  total_trade_value: number | null
+  stock_count: number
 }
 
 interface Props {
   conceptId: number
   conceptName: string
-  stockCode: string
-  stockName: string
   metricCode: string
   startDate: string
   endDate: string
@@ -22,15 +20,13 @@ interface Props {
 const props = defineProps<Props>()
 
 const loading = ref(false)
-const rankingData = ref<RankingData[]>([])
+const dailyData = ref<DailySummary[]>([])
 const chartOption = ref({})
 
-const chartKey = computed(() => `chart-${props.conceptId}-${props.stockCode}`)
-
 const initChart = async () => {
-  console.log('initChart 开始执行:', {
+  console.log('ConceptDailyTradeChart initChart 开始执行:', {
     conceptId: props.conceptId,
-    stockCode: props.stockCode,
+    conceptName: props.conceptName,
     startDate: props.startDate,
     endDate: props.endDate,
     metricCode: props.metricCode
@@ -38,8 +34,7 @@ const initChart = async () => {
 
   loading.value = true
   try {
-    const url = `/api/v1/concepts/${props.conceptId}/stock-rank-history?` +
-      `stock_code=${props.stockCode}&` +
+    const url = `/api/v1/concepts/${props.conceptId}/daily-trade-summary?` +
       `start_date=${props.startDate}&` +
       `end_date=${props.endDate}&` +
       `metric_code=${props.metricCode}`
@@ -52,12 +47,13 @@ const initChart = async () => {
     }
 
     const data = await response.json()
-    rankingData.value = data.history || []
+    dailyData.value = data.daily_summary || []
+    console.log('获取到每日交易总和数据:', dailyData.value.length, '条记录')
 
     // Generate chart option
-    const dates = rankingData.value.map(item => item.trade_date)
-    const ranks = rankingData.value.map(item => item.rank)
-    const tradeValues = rankingData.value.map(item => item.trade_value)
+    const dates = dailyData.value.map(item => item.trade_date)
+    const tradeValues = dailyData.value.map(item => item.total_trade_value)
+    const stockCounts = dailyData.value.map(item => item.stock_count)
 
     chartOption.value = {
       tooltip: {
@@ -65,15 +61,15 @@ const initChart = async () => {
         formatter: (params: any) => {
           if (Array.isArray(params) && params.length > 0) {
             const date = params[0].axisValue
-            const rank = params[0].value !== null ? `排名: ${params[0].value}` : '排名: -'
-            const value = params[1].value !== null ? `交易量: ${formatValue(params[1].value)}` : '交易量: -'
-            return `${date}<br/>${rank}<br/>${value}`
+            const tradeValue = params[0].value !== null ? `交易总和: ${formatValue(params[0].value)}` : '交易总和: -'
+            const count = params[1].value !== null ? `股票数: ${params[1].value}` : '股票数: -'
+            return `${date}<br/>${tradeValue}<br/>${count}`
           }
           return ''
         }
       },
       legend: {
-        data: ['排名', '交易量'],
+        data: ['每日交易总和', '股票数量'],
         top: 30
       },
       grid: {
@@ -91,53 +87,48 @@ const initChart = async () => {
       yAxis: [
         {
           type: 'value',
-          name: '排名',
+          name: '交易总和',
           position: 'left',
-          inverse: true,
           axisLabel: {
-            formatter: (value: number) => Math.round(value)
+            formatter: (value: number) => formatValue(value)
           }
         },
         {
           type: 'value',
-          name: '交易量',
+          name: '股票数',
           position: 'right',
           axisLabel: {
-            formatter: (value: number) => formatValue(value)
+            formatter: (value: number) => Math.round(value)
           }
         }
       ],
       series: [
         {
-          name: '排名',
-          data: ranks,
-          type: 'line',
-          smooth: true,
-          yAxisIndex: 0,
-          itemStyle: {
-            color: '#409EFF'
-          },
-          areaStyle: {
-            color: 'rgba(64, 158, 255, 0.2)'
-          }
-        },
-        {
-          name: '交易量',
+          name: '每日交易总和',
           data: tradeValues,
           type: 'line',
           smooth: true,
-          yAxisIndex: 1,
+          yAxisIndex: 0,
           itemStyle: {
             color: '#67C26A'
           },
           areaStyle: {
             color: 'rgba(103, 194, 106, 0.2)'
           }
+        },
+        {
+          name: '股票数量',
+          data: stockCounts,
+          type: 'bar',
+          yAxisIndex: 1,
+          itemStyle: {
+            color: '#E6A23C'
+          }
         }
       ]
     }
   } catch (error) {
-    ElMessage.error(`加载排名数据失败: ${error}`)
+    ElMessage.error(`加载概念每日交易总和失败: ${error}`)
     console.error(error)
   } finally {
     loading.value = false
@@ -155,9 +146,9 @@ const formatValue = (value: number | null): string => {
 }
 
 onMounted(() => {
-  console.log('StockRankingChart 组件已挂载:', {
+  console.log('ConceptDailyTradeChart 组件已挂载:', {
     conceptId: props.conceptId,
-    stockCode: props.stockCode,
+    conceptName: props.conceptName,
     startDate: props.startDate,
     endDate: props.endDate,
     metricCode: props.metricCode
@@ -169,7 +160,7 @@ onMounted(() => {
 watch(
   () => [props.startDate, props.endDate],
   (newVal, oldVal) => {
-    console.log('StockRankingChart props 日期变化检测到:', {
+    console.log('ConceptDailyTradeChart props 日期变化检测到:', {
       oldVal,
       newVal,
       startDate: props.startDate,
@@ -182,21 +173,61 @@ watch(
 </script>
 
 <template>
-  <div class="stock-ranking-chart">
+  <div class="concept-daily-trade-chart">
     <div class="chart-title">
-      {{ stockName }}({{ stockCode }}) 在 {{ conceptName }} 中的排名趋势
+      <h4>{{ conceptName }} - 每日交易总和趋势</h4>
+      <span v-if="loading" class="loading-indicator">加载中...</span>
     </div>
-    <el-skeleton :loading="loading" animated>
-      <VChart :key="chartKey" :option="chartOption" style="width: 100%; height: 400px" />
-    </el-skeleton>
+    <div v-if="!loading" class="chart-wrapper">
+      <VChart
+        :option="chartOption"
+        autoresize
+        style="height: 350px; width: 100%"
+      />
+    </div>
+    <div v-else class="loading-placeholder">
+      <p>正在加载图表数据...</p>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.stock-ranking-chart {
-  padding: 20px;
-  background: #f5f7fa;
+.concept-daily-trade-chart {
+  width: 100%;
+}
+
+.chart-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.chart-title h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.loading-indicator {
+  font-size: 12px;
+  color: #909399;
+}
+
+.chart-wrapper {
+  background: #fafafa;
   border-radius: 4px;
-  margin-top: 20px;
+  padding: 8px;
+}
+
+.loading-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 350px;
+  background: #f9fafc;
+  border-radius: 4px;
+  color: #909399;
 }
 </style>
