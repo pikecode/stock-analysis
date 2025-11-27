@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.models.stock import Stock, Concept, StockConcept, ConceptStockDailyRank, ConceptDailySummary
@@ -159,9 +160,19 @@ async def get_stock_concepts_ranked(
             detail=f"Stock {stock_code} not found",
         )
 
+    # Create subquery to count actual stocks in each concept (from stock_concepts master data)
+    # instead of using the daily summary which may have incomplete data
+    concept_stock_count_subquery = (
+        db.query(
+            StockConcept.concept_id,
+            func.count(StockConcept.id).label("actual_stock_count"),
+        )
+        .group_by(StockConcept.concept_id)
+        .subquery()
+    )
+
     # Get stock concepts with ranking data and daily summary
-    # Query: JOIN stock_concepts with ConceptStockDailyRank (for rank/percentile)
-    #        LEFT OUTER JOIN ConceptDailySummary (for concept totals)
+    # Use stock_concepts count (master data) instead of concept_daily_summary.stock_count
     results = (
         db.query(
             Concept.id,
@@ -171,7 +182,7 @@ async def get_stock_concepts_ranked(
             ConceptStockDailyRank.rank,
             ConceptStockDailyRank.percentile,
             ConceptDailySummary.total_value,
-            ConceptDailySummary.stock_count,
+            concept_stock_count_subquery.c.actual_stock_count,  # Use stock_concepts count instead
             ConceptDailySummary.avg_value,
         )
         .join(
@@ -191,7 +202,12 @@ async def get_stock_concepts_ranked(
             & (ConceptDailySummary.trade_date == trade_date)
             & (ConceptDailySummary.metric_code == metric_code),
         )
+        .outerjoin(
+            concept_stock_count_subquery,
+            Concept.id == concept_stock_count_subquery.c.concept_id,
+        )
         .filter(StockConcept.stock_code == stock_code)
+        .distinct()
         .order_by(ConceptStockDailyRank.trade_value.desc())
         .all()
     )
@@ -206,7 +222,7 @@ async def get_stock_concepts_ranked(
             rank=r[4],
             percentile=float(r[5]) if r[5] else None,
             concept_total_value=r[6],
-            concept_stock_count=r[7],
+            concept_stock_count=int(r[7]) if r[7] else None,
             concept_avg_value=float(r[8]) if r[8] else None,
         )
         for r in results
