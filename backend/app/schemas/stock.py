@@ -1,8 +1,39 @@
 """Stock and concept schemas."""
+from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel
+
+
+# Concept schemas (defined first for dependencies)
+class ConceptBase(BaseModel):
+    """Base concept schema."""
+
+    concept_name: str
+    category: Optional[str] = None
+
+
+class ConceptBrief(BaseModel):
+    """Brief concept info."""
+
+    id: int
+    concept_name: str
+    category: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConceptResponse(ConceptBase):
+    """Concept response schema."""
+
+    id: int
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # Stock schemas
@@ -35,37 +66,7 @@ class StockListResponse(BaseModel):
 class StockWithConcepts(StockResponse):
     """Stock with concepts."""
 
-    concepts: list["ConceptBrief"] = []
-
-
-# Concept schemas
-class ConceptBase(BaseModel):
-    """Base concept schema."""
-
-    concept_name: str
-    category: Optional[str] = None
-
-
-class ConceptResponse(ConceptBase):
-    """Concept response schema."""
-
-    id: int
-    description: Optional[str] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ConceptBrief(BaseModel):
-    """Brief concept info."""
-
-    id: int
-    concept_name: str
-    category: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    concepts: list[ConceptBrief] = []
 
 
 class ConceptListResponse(BaseModel):
