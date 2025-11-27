@@ -92,7 +92,7 @@ class ComputeService:
         sql = text("""
             INSERT INTO concept_daily_summary (
                 metric_type_id, metric_code, concept_id, trade_date,
-                total_value, avg_value, max_value, min_value, stock_count,
+                total_value, avg_value, max_value, min_value,
                 median_value, import_batch_id
             )
             SELECT
@@ -104,7 +104,6 @@ class ComputeService:
                 AVG(r.trade_value)::BIGINT as avg_value,
                 MAX(r.trade_value) as max_value,
                 MIN(r.trade_value) as min_value,
-                COUNT(*) as stock_count,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.trade_value)::BIGINT as median_value,
                 :batch_id as import_batch_id
             FROM stock_metric_data_raw r
@@ -118,7 +117,6 @@ class ComputeService:
                 avg_value = EXCLUDED.avg_value,
                 max_value = EXCLUDED.max_value,
                 min_value = EXCLUDED.min_value,
-                stock_count = EXCLUDED.stock_count,
                 median_value = EXCLUDED.median_value,
                 computed_at = CURRENT_TIMESTAMP,
                 import_batch_id = EXCLUDED.import_batch_id

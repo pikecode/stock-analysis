@@ -310,7 +310,6 @@ class OptimizedTXTImportService:
                 'min_value': min_value,
                 'median_value': median_value,
                 'top10_sum': top10_sum,
-                'stock_count': total_stocks,
                 'import_batch_id': batch_id
             })
 
@@ -456,7 +455,6 @@ class OptimizedTXTImportService:
                 s['min_value'],
                 s['median_value'],
                 s['top10_sum'],
-                s['stock_count'],
                 s['import_batch_id']
             ])
 
@@ -483,7 +481,6 @@ class OptimizedTXTImportService:
                         {s['min_value']},
                         {s['median_value']},
                         {s['top10_sum']},
-                        {s['stock_count']},
                         {s['import_batch_id']}
                     )""")
 
@@ -491,7 +488,7 @@ class OptimizedTXTImportService:
                     INSERT INTO concept_daily_summary (
                         metric_type_id, metric_code, concept_id, trade_date,
                         total_value, avg_value, max_value, min_value,
-                        median_value, top10_sum, stock_count, import_batch_id
+                        median_value, top10_sum, import_batch_id
                     )
                     VALUES {','.join(values)}
                     ON CONFLICT (metric_type_id, concept_id, trade_date)

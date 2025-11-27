@@ -50,7 +50,6 @@ async def get_concept_summary(
                 avg_value=s.avg_value or 0,
                 max_value=s.max_value or 0,
                 min_value=s.min_value or 0,
-                stock_count=s.stock_count or 0,
                 median_value=s.median_value,
                 top10_sum=s.top10_sum,
             )
@@ -97,7 +96,6 @@ async def compare_metrics(
                 "avg_value": s.avg_value,
                 "max_value": s.max_value,
                 "min_value": s.min_value,
-                "stock_count": s.stock_count,
             }
             for s in summaries
         ],

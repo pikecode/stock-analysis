@@ -194,7 +194,6 @@ class ConceptDailySummary(Base):
     avg_value = Column(BigInteger)
     max_value = Column(BigInteger)
     min_value = Column(BigInteger)
-    stock_count = Column(Integer)
     median_value = Column(BigInteger)
     top10_sum = Column(BigInteger)
     computed_at = Column(DateTime, default=datetime.utcnow)

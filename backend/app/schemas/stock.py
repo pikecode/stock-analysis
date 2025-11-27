@@ -149,7 +149,6 @@ class DailySummaryItem(BaseModel):
     avg_value: int
     max_value: int
     min_value: int
-    stock_count: int
     median_value: Optional[int] = None
     top10_sum: Optional[int] = None
 

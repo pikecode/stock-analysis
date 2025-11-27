@@ -360,7 +360,8 @@ WHERE r.import_batch_id = :batch_id AND r.is_valid = true
 
 **核心设计理念**：
 - **一行 = 一个概念在一天的汇总数据**
-- 包含该概念所有股票的聚合统计：总值、均值、最大值、最小值等
+- 包含该概念在导入数据中有记录的股票的聚合统计：总值、均值、最大值、最小值等
+- ⚠️ **注意**：概念包含的股票数由 `stock_concepts` 表管理（主数据），不在此表存储
 
 | 字段 | 类型 | 说明 | 约束 |
 |------|------|------|------|
@@ -369,11 +370,10 @@ WHERE r.import_batch_id = :batch_id AND r.is_valid = true
 | metric_code | VARCHAR(50) | 指标代码 | 如：EEE, TTV |
 | concept_id | INTEGER | 概念ID | FK → concepts |
 | trade_date | DATE | 交易日期 | NOT NULL |
-| **total_value** | BIGINT | **所有股票的trade_value总和** | SUM(trade_value) |
+| **total_value** | BIGINT | **该日期有数据的所有股票的trade_value总和** | SUM(trade_value) |
 | **avg_value** | BIGINT | **平均值** | AVG(trade_value) |
 | **max_value** | BIGINT | **最大值** | MAX(trade_value) |
 | **min_value** | BIGINT | **最小值** | MIN(trade_value) |
-| **stock_count** | INTEGER | **该概念有多少只股票** | COUNT(*) |
 | **median_value** | BIGINT | **中位数** | PERCENTILE_CONT(0.5) |
 | **top10_sum** | BIGINT | **前10只股票的trade_value总和** | 单独计算 |
 | computed_at | TIMESTAMP | 计算时间 | 默认当前时间 |
@@ -383,25 +383,28 @@ WHERE r.import_batch_id = :batch_id AND r.is_valid = true
 
 **实际例子**（2025-11-04 EEE指标 银行概念）：
 ```
-stock_count: 43          -- 该日期有数据的银行股票数（来自stock_metric_data_raw）
-total_value: 42,408,691  -- 这43只股票的EEE值总和
-avg_value: 986,248       -- 平均值 = 42408691 / 43
+total_value: 42,408,691  -- 该日期有数据的股票的EEE值总和
+avg_value: 986,248       -- 平均值
 max_value: 5,140,764     -- 最高的股票值
 min_value: 44,659        -- 最低的股票值
 median_value: 441,832    -- 中间值
 top10_sum: 26,908,249    -- 排名前10的股票值总和
 ```
 
-**⚠️ 注意：stock_count 的含义和局限性**
+**设计决策**：
 
-- `concept_daily_summary.stock_count` = 该日期有指标数据的股票数（可能 < 实际概念包含的股票数）
-- 实际概念包含的所有股票数 = `stock_concepts` 表中该概念的股票数（静态主数据）
-- 查询时应该优先使用 `stock_concepts` 中的数据来获取完整的概念-股票关系
-- 原因：CSV 导入数据可能不完整，某些股票在某些日期可能没有数据，导致 `stock_count` 偏小
+早期版本在此表中存储了 `stock_count`（该日期有数据的股票数），但这造成了设计问题：
+- ❌ 违反数据库范式（概念的股票数是静态的主数据，不应该在日汇总表中）
+- ❌ 造成语义混淆（两个不同的"股票数"：概念包含数 vs. 该日期有数据的股票数）
+- ✅ **改进方案**：概念包含的股票数总是从 `stock_concepts` 表查询
 
-**计算SQL**（来自 `compute_service.py` 第90-128行）：
+**计算SQL**（来自 `compute_service.py` 第90-126行）：
 ```sql
-INSERT INTO concept_daily_summary (...)
+INSERT INTO concept_daily_summary (
+    metric_type_id, metric_code, concept_id, trade_date,
+    total_value, avg_value, max_value, min_value,
+    median_value, import_batch_id
+)
 SELECT
     r.metric_type_id,
     r.metric_code,
@@ -411,7 +414,6 @@ SELECT
     AVG(r.trade_value)::BIGINT as avg_value,
     MAX(r.trade_value) as max_value,
     MIN(r.trade_value) as min_value,
-    COUNT(*) as stock_count,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.trade_value)::BIGINT as median_value,
     :batch_id as import_batch_id
 FROM stock_metric_data_raw r
@@ -420,7 +422,7 @@ WHERE r.import_batch_id = :batch_id AND r.is_valid = true
 GROUP BY r.metric_type_id, r.metric_code, sc.concept_id, r.trade_date
 ```
 
-top10_sum 单独计算（第133-155行）。
+top10_sum 单独计算。
 
 ---
 
@@ -765,32 +767,28 @@ ORDER BY r.rank ASC
 LIMIT 5;
 ```
 
-### 查询5：正确获取概念的实际股票数（重要）
+### 查询5：获取概念的实际股票数（正确方法）
 
-**需求**：获取"银行"概念的实际包含股票数（而不是某日期的有数据股票数）
+**需求**：获取"银行"概念包含的股票数
 
 ```sql
--- ❌ 错误做法：使用 concept_daily_summary.stock_count
--- 这会得到该日期有数据的股票数，可能不完整
-SELECT COUNT(*) as stock_count
-FROM concept_daily_summary
-WHERE concept_id = (SELECT id FROM concepts WHERE concept_name = '银行')
-  AND trade_date = '2025-11-04'
-  AND metric_code = 'EEE';
--- 结果: 43（该日期有数据的股票数）
-
 -- ✅ 正确做法：从 stock_concepts 主数据表查询
-SELECT COUNT(*) as actual_stock_count
+SELECT COUNT(*) as concept_total_stock_count
 FROM stock_concepts
 WHERE concept_id = (SELECT id FROM concepts WHERE concept_name = '银行');
--- 结果: 86（概念实际包含的所有股票数，不变）
+-- 结果: 86（概念实际包含的所有股票数，不受日期影响，永不改变）
 ```
 
-**说明**：
-- `concept_daily_summary.stock_count` 是导入数据时计算的，只包含有数据的股票
-- 实际的概念-股票关系存储在 `stock_concepts` 表（主数据）
-- 当需要显示"概念包含股票数"时，应从 `stock_concepts` 查询
-- 当需要显示"该日期有数据的股票数"时，可用 `concept_daily_summary.stock_count`
+**设计说明**：
+
+- **之前的问题**：`concept_daily_summary` 中存储了 `stock_count`，表示该日期有数据的股票数
+  - 这造成语义混淆，容易误认为是"概念包含的股票数"
+  - 实际上这只是"导入数据中有记录的股票数"
+
+- **改进方案**：
+  - ✅ 概念包含的股票数 → 总是从 `stock_concepts` 表查询（权威来源）
+  - ✅ 该日期有数据的股票数 → 可从 `stock_metric_data_raw` 动态计算，不需要持久化
+  - ✅ 日汇总表只关注聚合统计（总值、均值、极值等），不存储计数
 
 ---
 
