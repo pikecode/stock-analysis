@@ -13,6 +13,7 @@ set -e  # 遇到错误立即退出
 DB_USER="${DB_USER:-peak}"
 DB_NAME="${DB_NAME:-stock_analysis}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SQL_FILE="$SCRIPT_DIR/clean_stock_data.sql"
 
 echo "============================================================================"
 echo "股票数据清理脚本"
@@ -36,7 +37,7 @@ echo "正在执行清理脚本..."
 echo ""
 
 # 执行 SQL 脚本
-psql -U "$DB_USER" -d "$DB_NAME" -f "$SCRIPT_DIR/clean_stock_data.sql"
+psql -U "$DB_USER" -d "$DB_NAME" -f "$SQL_FILE"
 
 echo ""
 echo "============================================================================"

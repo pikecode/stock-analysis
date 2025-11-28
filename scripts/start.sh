@@ -75,7 +75,7 @@ health_check_backend() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://127.0.0.1:8000/health 2>/dev/null | grep -q "healthy"; then
+        if curl -s http://127.0.0.1:8006/health 2>/dev/null | grep -q "healthy"; then
             return 0  # Service is healthy
         fi
         attempt=$((attempt + 1))
@@ -89,7 +89,7 @@ health_check_frontend() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://127.0.0.1:3000 >/dev/null 2>&1; then
+        if curl -s http://127.0.0.1:8005 >/dev/null 2>&1; then
             return 0  # Service is responding
         fi
         attempt=$((attempt + 1))
@@ -119,9 +119,9 @@ start_backend() {
     echo -e "${YELLOW}启动后端 API...${NC}"
 
     # Force kill if port is already in use
-    if check_port 8000; then
+    if check_port 8006; then
         echo -e "  ${YELLOW}⚠️  端口 8000 已被占用，尝试清理...${NC}"
-        lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+        lsof -ti:8006 | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
 
@@ -132,7 +132,7 @@ start_backend() {
     export $(grep -v '^#' "$PROJECT_DIR/.env" | xargs)
 
     # Start uvicorn in background
-    nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload \
+    nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8006 --reload \
         > "$PROJECT_DIR/logs/backend.log" 2>&1 &
     BACKEND_PID=$!
     echo $BACKEND_PID > "$PID_DIR/backend.pid"
@@ -142,9 +142,9 @@ start_backend() {
 
     echo -e "  ${CYAN}⏳ 等待后端服务启动...${NC}"
     if health_check_backend; then
-        echo -e "  ${GREEN}✓ 后端已启动: http://127.0.0.1:8000${NC}"
-        echo -e "  ${GREEN}✓ API 文档 (Swagger): http://127.0.0.1:8000/docs${NC}"
-        echo -e "  ${GREEN}✓ API 文档 (ReDoc): http://127.0.0.1:8000/redoc${NC}"
+        echo -e "  ${GREEN}✓ 后端已启动: http://127.0.0.1:8006${NC}"
+        echo -e "  ${GREEN}✓ API 文档 (Swagger): http://127.0.0.1:8006/docs${NC}"
+        echo -e "  ${GREEN}✓ API 文档 (ReDoc): http://127.0.0.1:8006/redoc${NC}"
         echo -e "  ${GREEN}✓ 进程 PID: $BACKEND_PID${NC}"
     else
         echo -e "  ${RED}✗ 后端启动失败${NC}"
@@ -162,9 +162,9 @@ start_frontend() {
     echo -e "${YELLOW}启动前端开发服务器...${NC}"
 
     # Force kill if port is already in use
-    if check_port 3000; then
+    if check_port 8005; then
         echo -e "  ${YELLOW}⚠️  端口 3000 已被占用，尝试清理...${NC}"
-        lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+        lsof -ti:8005 | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
 
@@ -179,7 +179,7 @@ start_frontend() {
 
     echo -e "  ${CYAN}⏳ 等待前端服务启动...${NC}"
     if health_check_frontend; then
-        echo -e "  ${GREEN}✓ 前端已启动: http://127.0.0.1:3000${NC}"
+        echo -e "  ${GREEN}✓ 前端已启动: http://127.0.0.1:8005${NC}"
         echo -e "  ${GREEN}✓ 进程 PID: $FRONTEND_PID${NC}"
     else
         echo -e "  ${RED}✗ 前端启动失败${NC}"
@@ -234,8 +234,8 @@ stop_all() {
 
     # Force kill any remaining processes on our ports
     echo -e "${CYAN}清理残留进程...${NC}"
-    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:8006 | xargs kill -9 2>/dev/null || true
+    lsof -ti:8005 | xargs kill -9 2>/dev/null || true
     lsof -ti:3001 | xargs kill -9 2>/dev/null || true
     lsof -ti:3002 | xargs kill -9 2>/dev/null || true
 
@@ -251,14 +251,14 @@ show_status() {
     echo -e "${CYAN}服务状态:${NC}"
     echo ""
 
-    if check_port 8000; then
-        echo -e "  ${GREEN}● 后端 API${NC}     http://localhost:8000"
+    if check_port 8006; then
+        echo -e "  ${GREEN}● 后端 API${NC}     http://localhost:8006"
     else
         echo -e "  ${RED}○ 后端 API${NC}     未运行"
     fi
 
-    if check_port 3000; then
-        echo -e "  ${GREEN}● 前端开发${NC}     http://localhost:3000"
+    if check_port 8005; then
+        echo -e "  ${GREEN}● 前端开发${NC}     http://localhost:8005"
     else
         echo -e "  ${RED}○ 前端开发${NC}     未运行"
     fi
@@ -339,10 +339,10 @@ start_all() {
     echo -e "${GREEN}════════════════════════════════════════════${NC}"
     echo ""
     echo -e "${CYAN}📱 访问地址:${NC}"
-    echo -e "  前端:         ${BLUE}http://127.0.0.1:3000${NC}"
-    echo -e "  API:          ${BLUE}http://127.0.0.1:8000${NC}"
-    echo -e "  文档 (Swagger): ${BLUE}http://127.0.0.1:8000/docs${NC}"
-    echo -e "  文档 (ReDoc):   ${BLUE}http://127.0.0.1:8000/redoc${NC}"
+    echo -e "  前端:         ${BLUE}http://127.0.0.1:8005${NC}"
+    echo -e "  API:          ${BLUE}http://127.0.0.1:8006${NC}"
+    echo -e "  文档 (Swagger): ${BLUE}http://127.0.0.1:8006/docs${NC}"
+    echo -e "  文档 (ReDoc):   ${BLUE}http://127.0.0.1:8006/redoc${NC}"
     echo ""
     echo -e "${CYAN}👤 默认账户:${NC}"
     echo "  Admin 用户:"

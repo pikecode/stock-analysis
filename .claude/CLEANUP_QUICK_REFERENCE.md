@@ -5,8 +5,7 @@
 ### 最简单的方式（推荐）
 
 ```bash
-cd backend
-./scripts/clean_stock_data.sh
+./clean_stock_data.sh
 ```
 
 就这么简单！脚本会：
@@ -17,13 +16,13 @@ cd backend
 ### 直接使用 SQL（跳过确认）
 
 ```bash
-psql -U peak -d stock_analysis -f backend/scripts/clean_stock_data.sql
+psql -U peak -d stock_analysis -f clean_stock_data.sql
 ```
 
 ### 自定义用户名
 
 ```bash
-DB_USER=your_username ./backend/scripts/clean_stock_data.sh
+DB_USER=your_username ./clean_stock_data.sh
 ```
 
 ---
@@ -52,7 +51,7 @@ DB_USER=your_username ./backend/scripts/clean_stock_data.sh
 
 ```bash
 # 1. 清空旧数据
-./backend/scripts/clean_stock_data.sh
+./clean_stock_data.sh
 
 # 2. 启动开发服务器
 # 终端 1
@@ -76,7 +75,7 @@ cd frontend && npm run dev
 ## 文件位置
 
 ```
-backend/scripts/
+根目录 (/Users/peak/work/pikecode/stock-analysis/)
 ├── clean_stock_data.sh        ← 运行这个文件（推荐）
 ├── clean_stock_data.sql       ← SQL 脚本（自动调用）
 ├── CLEAN_STOCK_DATA_README.md ← 详细文档
@@ -114,7 +113,7 @@ pg_dump -U peak stock_analysis > backup_$(date +%Y%m%d).sql
 
 ## 相关文档
 
-- 📖 **完整文档**: `backend/scripts/CLEAN_STOCK_DATA_README.md`
+- 📖 **完整文档**: `CLEAN_STOCK_DATA_README.md`
 - 🚀 **导入指南**: `test-data/QUICK_START.md`
 - 📊 **测试数据**: `test-data/README.md`
 - 🔄 **导入流程**: `.spec-workflow/data-import-workflow.md`
