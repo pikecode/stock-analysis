@@ -16,7 +16,7 @@ from app.services.optimized_csv_import import OptimizedCSVImportService
 from app.services.optimized_txt_import import OptimizedTXTImportService
 from app.schemas.stock import ImportBatchResponse, ImportUploadResponse
 
-router = APIRouter(prefix="/import", tags=["Import"])
+router = APIRouter(prefix="/admin/import", tags=["Import"])
 
 
 @router.post("/upload", response_model=ImportUploadResponse)

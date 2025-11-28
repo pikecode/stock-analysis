@@ -104,11 +104,11 @@ export const summaryApi = {
   },
 }
 
-// Import API
+// Import API (Admin only - use /admin prefix for proper token selection)
 export const importApi = {
   upload(formData: FormData) {
     return request.post<any, { batch_id: number; status: string; message: string }>(
-      '/import/upload',
+      '/admin/import/upload',
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -116,16 +116,16 @@ export const importApi = {
     )
   },
   getBatches(params: { status?: string; page?: number; page_size?: number }) {
-    return request.get<any, ImportBatch[]>('/import/batches', { params })
+    return request.get<any, ImportBatch[]>('/admin/import/batches', { params })
   },
   getBatch(batchId: number) {
-    return request.get<any, ImportBatch>(`/import/batches/${batchId}`)
+    return request.get<any, ImportBatch>(`/admin/import/batches/${batchId}`)
   },
   recompute(batchId: number) {
-    return request.post<any, any>(`/import/batches/${batchId}/recompute`)
+    return request.post<any, any>(`/admin/import/batches/${batchId}/recompute`)
   },
   getMetrics() {
-    return request.get<any, MetricType[]>('/import/metrics')
+    return request.get<any, MetricType[]>('/admin/import/metrics')
   },
 }
 
