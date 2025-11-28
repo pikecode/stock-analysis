@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, TrendCharts, DataAnalysis, DocumentCopy, Check } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores'
+import { Search, TrendCharts, DataAnalysis, DocumentCopy, Check, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const searchValue = ref('')
 const plans = ref<any[]>([])
 
@@ -12,6 +15,13 @@ const handleSearch = () => {
   if (searchValue.value) {
     router.push({ name: 'PublicStocks', query: { search: searchValue.value } })
   }
+}
+
+// 退出登录
+const handleLogout = async () => {
+  await authStore.logout()
+  ElMessage.success('已退出登录')
+  router.push({ name: 'Home' })
 }
 
 // 导航到功能页面
@@ -75,8 +85,38 @@ onMounted(() => {
         </nav>
 
         <div class="auth-buttons">
-          <el-button @click="navigateTo('Login')">登录</el-button>
-          <el-button type="primary" @click="navigateTo('Login')">注册</el-button>
+          <!-- 未登录状态 -->
+          <template v-if="!authStore.isLoggedIn">
+            <el-button @click="navigateTo('Login')">登录</el-button>
+            <el-button type="primary" @click="navigateTo('Login')">注册</el-button>
+          </template>
+
+          <!-- 已登录状态 -->
+          <template v-else>
+            <el-dropdown>
+              <span class="el-dropdown-link">
+                👤 {{ authStore.user?.username }}
+                <el-icon class="is-icon"><arrow-down /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="navigateTo('Reports')" v-if="authStore.isCustomer">
+                    📊 查看报表
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="navigateTo('UserProfile')">
+                    👤 个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="navigateTo('UserSettings')">
+                    ⚙️ 账户设置
+                  </el-dropdown-item>
+                  <el-divider />
+                  <el-dropdown-item @click="handleLogout">
+                    🚪 退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
         </div>
       </div>
     </header>

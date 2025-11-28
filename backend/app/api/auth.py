@@ -55,6 +55,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        role=user.role.value,
     )
 
 
@@ -92,6 +93,7 @@ async def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_
         access_token=access_token,
         refresh_token=new_refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        role=user.role.value,
     )
 
 

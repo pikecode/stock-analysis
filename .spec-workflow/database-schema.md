@@ -12,6 +12,33 @@
 
 ## 数据库架构概述
 
+### Token 存储架构（前端）
+
+**重要说明**：用户认证采用 JWT 双Token独立存储架构。后端生成的 Token 在前端分类存储：
+
+```javascript
+// localStorage 中的 Token 存储
+// 管理员身份
+{
+  "admin_access_token": "eyJhbGc...",      // 有效期：30分钟
+  "admin_refresh_token": "eyJhbGc...",     // 有效期：7天
+}
+
+// 客户端身份
+{
+  "client_access_token": "eyJhbGc...",     // 有效期：30分钟
+  "client_refresh_token": "eyJhbGc...",    // 有效期：7天
+}
+```
+
+**验证说明**：
+- 后端返回的 JWT Token 在 Payload 中包含 `role` 字段
+- `role` 值为 `ADMIN`, `VIP`, 或 `NORMAL`（大写）
+- 前端根据登录页面自动分类存储 Token
+- 请求时根据 URL 路径自动选择对应的 Token
+
+详见：`.spec-workflow/authentication-dual-token.md`
+
 ### 表分类
 
 本系统采用分层设计，分为三层：

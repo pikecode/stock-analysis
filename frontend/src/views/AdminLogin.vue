@@ -38,16 +38,25 @@ const handleLogin = async () => {
   loading.value = true
 
   try {
-    console.log('➡️ 开始调用 authStore.login()...')
-    await authStore.login(form.value)
-    console.log('⬅️ authStore.login() 完成')
+    console.log('➡️ 开始调用 authStore.login(form, "admin")...')
+    const success = await authStore.login(form.value, 'admin')
+    console.log('⬅️ authStore.login() 完成，结果:', success)
+
+    if (!success) {
+      console.error('❌ 登录失败')
+      ElMessage.error('用户名或密码错误')
+      return
+    }
 
     // 检查是否是管理员
-    console.log('🔍 检查用户角色，isAdmin:', authStore.isAdmin)
+    console.log('🔍 检查用户角色')
+    console.log('🔍 authStore.adminUser:', authStore.adminUser)
+    console.log('🔍 adminUser.role:', authStore.adminUser?.role)
+    console.log('🔍 isAdmin:', authStore.isAdmin)
     if (!authStore.isAdmin) {
-      console.error('❌ 用户不是管理员')
-      ElMessage.error('此页面仅限管理员访问')
-      await authStore.logout()
+      console.error('❌ 用户不是管理员，角色为:', authStore.adminUser?.role || '未知')
+      ElMessage.error(`此页面仅限管理员访问。您的角色为: ${authStore.adminUser?.role || '未知'}`)
+      await authStore.logout('admin')
       // 清空表单
       form.value.username = ''
       form.value.password = ''

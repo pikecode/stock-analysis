@@ -51,18 +51,31 @@ const handleLogin = async () => {
   loading.value = true
 
   try {
-    console.log('➡️ 开始调用 authStore.login()...')
-    const success = await authStore.login(form)
+    console.log('➡️ 开始调用 authStore.login(form, "client")...')
+    const success = await authStore.login(form, 'client')
     console.log('⬅️ authStore.login() 返回:', success)
 
     if (success) {
+      // 检查是否是管理员
+      console.log('🔍 检查用户角色，isAdmin:', authStore.isAdmin)
+      if (authStore.isAdmin) {
+        console.error('❌ 管理员用户不能访问客户端')
+        ElMessage.error('管理员用户请使用管理员登录页面')
+        await authStore.logout('client')
+        // 清空表单
+        form.username = ''
+        form.password = ''
+        return
+      }
+
       console.log('✅ 登录成功！')
       ElMessage.success('登录成功')
 
-      // 重定向
-      const redirect = authStore.isAdmin ? '/admin' : authStore.isCustomer ? '/reports' : '/'
-      console.log('📍 重定向到:', redirect)
-      router.push(redirect)
+      // 重定向到首页，让路由守卫处理后续的权限检查
+      // 等待用户信息加载完成再重定向
+      console.log('📍 重定向到: /')
+      await new Promise(resolve => setTimeout(resolve, 100))
+      router.push('/')
     } else {
       console.log('❌ 登录失败')
       ElMessage.error('用户名或密码错误')

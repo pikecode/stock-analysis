@@ -242,77 +242,152 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
-  const token = localStorage.getItem('access_token')
+  const adminToken = localStorage.getItem('admin_access_token')
+  const clientToken = localStorage.getItem('client_access_token')
   const requiresAuth = to.meta.requiresAuth !== false
 
-  // 1. 需要登录但没有 token
-  if (requiresAuth && !token) {
-    // 如果是访问管理员页面，重定向到管理员登录页
-    if (to.path.startsWith('/admin')) {
+  // 判断是否访问管理员路径
+  const isAdminPath = to.path.startsWith('/admin')
+  const hasAdminToken = !!adminToken
+  const hasClientToken = !!clientToken
+
+  console.log('[Router Guard] 路由检查:', {
+    path: to.path,
+    isAdminPath,
+    hasAdminToken,
+    hasClientToken,
+    requiresAuth,
+  })
+
+  // 1. 需要登录但没有相应的 token
+  // 允许跨身份认证：用户可以访问另一个身份的登录页面来切换认证
+  if (requiresAuth) {
+    if (isAdminPath && !hasAdminToken) {
+      // 管理员路径需要 admin token，重定向到管理员登录页面
+      // 允许客户端用户访问 /admin-login 来登录为管理员
+      console.log('[Router Guard] 管理员路径需要 admin token，重定向到管理员登录页')
       next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
-    } else {
-      // 否则重定向到普通登录页
-      next({ name: 'Login', query: { redirect: to.fullPath } })
+      return
     }
-    return
+    if (!isAdminPath && !hasClientToken) {
+      // 客户端路径需要 client token，重定向到客户端登录页面
+      // 允许管理员用户访问 /login 来登录为客户端
+      console.log('[Router Guard] 客户端路径需要 client token，重定向到登录页')
+      next({ name: 'Login', query: { redirect: to.fullPath } })
+      return
+    }
   }
 
   // 2. 已登录访问登录页，重定向到对应的首页
-  if ((to.name === 'Login' || to.name === 'AdminLogin') && token) {
-    if (authStore.isAdmin) {
-      next({ path: '/admin' })
-    } else {
-      next({ path: '/' })
-    }
+  // 允许跨身份认证：客户端用户可以访问 /admin-login 来登录为管理员，反之亦然
+  if (to.name === 'Login' && hasClientToken) {
+    // 客户端用户访问 /login，已有客户端登录，重定向到主页
+    console.log('[Router Guard] Client user 已登录，重定向到 /')
+    next({ path: '/' })
     return
   }
 
-  // 3. 角色权限检查
+  if (to.name === 'AdminLogin' && hasAdminToken) {
+    // 管理员用户访问 /admin-login，已有管理员登录，重定向到管理员页面
+    console.log('[Router Guard] Admin user 已登录，重定向到 /admin')
+    next({ path: '/admin' })
+    return
+  }
+
+  // 否则允许访问登录页（用户可以通过登录来切换身份）
+
+  // 3. 角色权限检查和强化登出逻辑
   const requiredRole = to.meta.requiredRole as string | undefined
   const requiresSubscription = to.meta.requiresSubscription as boolean | undefined
 
-  if (requiredRole && token) {
-    // 确保用户信息已加载
-    if (!authStore.user) {
-      authStore.fetchUser().then(() => {
-        if (!authStore.hasRole(requiredRole)) {
-          console.warn(`User does not have required role: ${requiredRole}`)
-          // 如果是管理员页面但不是管理员，重定向到首页
-          if (requiredRole === 'admin') {
-            next({ path: '/' })
+  // 特殊处理：'customer' 角色表示"需要 client token 的任何客户用户"（VIP或NORMAL）
+  const isRequiredRoleCustomer = requiredRole === 'customer'
+
+  if (requiredRole && (hasAdminToken || hasClientToken)) {
+    // 对于 'customer' 角色，检查是否有 client token（不检查具体的 role 值）
+    if (isRequiredRoleCustomer && hasClientToken) {
+      console.log('[Router Guard] 客户端用户已验证，继续检查订阅状态...')
+      // 确保用户信息已加载
+      if (!authStore.clientUser) {
+        authStore.fetchClientUser().then(() => {
+          if (requiresSubscription && !authStore.hasValidSubscription) {
+            console.warn('User subscription expired or invalid')
+            next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
           } else {
-            // 客户端角色不足，重定向到公开页面
-            next({ path: '/' })
+            next()
           }
-        } else if (requiresSubscription && !authStore.hasValidSubscription) {
-          // 需要订阅但订阅已过期
+        }).catch(() => {
+          localStorage.removeItem('client_access_token')
+          localStorage.removeItem('client_refresh_token')
+          next({ name: 'Login', query: { redirect: to.fullPath } })
+        })
+      } else {
+        if (requiresSubscription && !authStore.hasValidSubscription) {
           console.warn('User subscription expired or invalid')
           next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
         } else {
           next()
         }
-      }).catch(() => {
-        // token 无效，清除并重定向到登录页
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        if (to.path.startsWith('/admin')) {
+      }
+      return
+    }
+
+    // 对于其他角色（如 'admin'），使用 hasRole 检查
+    if (!isRequiredRoleCustomer && (hasAdminToken || hasClientToken)) {
+      // 确保用户信息已加载
+      const currentUser = isAdminPath ? authStore.adminUser : authStore.clientUser
+
+      if (!currentUser) {
+        console.log('[Router Guard] 用户信息未加载，正在获取...')
+        const fetchPromise = isAdminPath ? authStore.fetchAdminUser() : authStore.fetchClientUser()
+
+        fetchPromise
+          .then(() => {
+            const user = isAdminPath ? authStore.adminUser : authStore.clientUser
+            if (!user || !authStore.hasRole(requiredRole)) {
+              console.warn(`User does not have required role: ${requiredRole}`)
+              // 角色不匹配，强制登出并重定向到合适的登录页
+              if (isAdminPath) {
+                authStore.logout('admin')
+                next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
+              } else {
+                authStore.logout('client')
+                next({ name: 'Login', query: { redirect: to.fullPath } })
+              }
+            } else {
+              next()
+            }
+          })
+          .catch(() => {
+            // token 无效，清除并重定向到登录页
+            console.error('[Router Guard] 获取用户信息失败，token 可能无效')
+            if (isAdminPath) {
+              localStorage.removeItem('admin_access_token')
+              localStorage.removeItem('admin_refresh_token')
+              next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
+            } else {
+              localStorage.removeItem('client_access_token')
+              localStorage.removeItem('client_refresh_token')
+              next({ name: 'Login', query: { redirect: to.fullPath } })
+            }
+          })
+        return
+      }
+
+      if (!authStore.hasRole(requiredRole)) {
+        console.warn(`User does not have required role: ${requiredRole}`)
+        // 角色不匹配，强制登出并重定向到合适的登录页
+        if (isAdminPath) {
+          authStore.logout('admin')
           next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
         } else {
+          authStore.logout('client')
           next({ name: 'Login', query: { redirect: to.fullPath } })
         }
-      })
-      return
-    }
+        return
+      }
 
-    if (!authStore.hasRole(requiredRole)) {
-      console.warn(`User does not have required role: ${requiredRole}`)
-      next({ path: '/' })
-      return
-    }
-
-    if (requiresSubscription && !authStore.hasValidSubscription) {
-      console.warn('User subscription expired or invalid')
-      next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
+      next()
       return
     }
   }

@@ -15,7 +15,16 @@ request.interceptors.request.use(
       data: config.data,
     })
 
-    const token = localStorage.getItem('access_token')
+    // 根据请求路径选择正确的 token（管理员还是客户端）
+    let token: string | null = null
+    if (config.url?.includes('/admin')) {
+      token = localStorage.getItem('admin_access_token')
+      console.log('[API请求] 使用 admin_access_token')
+    } else {
+      token = localStorage.getItem('client_access_token')
+      console.log('[API请求] 使用 client_access_token')
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -51,16 +60,22 @@ request.interceptors.response.use(
           break
 
         case 401:
-          // Try refresh token
-          const refreshToken = localStorage.getItem('refresh_token')
+          // 根据请求路径选择要刷新的 token
+          const isAdminPath = error.config?.url?.includes('/admin')
+          const tokenKey = isAdminPath ? 'admin_refresh_token' : 'client_refresh_token'
+          const accessTokenKey = isAdminPath ? 'admin_access_token' : 'client_access_token'
+          const refreshToken = localStorage.getItem(tokenKey)
+
           if (refreshToken && !error.config?.url?.includes('/auth/')) {
             try {
+              console.log(`[API] 尝试刷新 ${isAdminPath ? 'admin' : 'client'} token...`)
               const res = await axios.post(`${baseURL}/auth/refresh`, {
                 refresh_token: refreshToken,
               })
               const { access_token, refresh_token } = res.data
-              localStorage.setItem('access_token', access_token)
-              localStorage.setItem('refresh_token', refresh_token)
+              localStorage.setItem(accessTokenKey, access_token)
+              localStorage.setItem(tokenKey, refresh_token)
+              console.log(`[API] ${isAdminPath ? 'admin' : 'client'} token 刷新成功`)
 
               // Retry original request
               if (error.config) {
@@ -69,15 +84,17 @@ request.interceptors.response.use(
               }
             } catch {
               // Refresh failed, logout
-              localStorage.removeItem('access_token')
-              localStorage.removeItem('refresh_token')
-              window.location.href = '/login'
+              console.error(`[API] ${isAdminPath ? 'admin' : 'client'} token 刷新失败`)
+              localStorage.removeItem(accessTokenKey)
+              localStorage.removeItem(tokenKey)
+              ElMessage.error('登录已过期，请重新登录')
+              window.location.href = isAdminPath ? '/admin-login' : '/login'
             }
           } else {
-            localStorage.removeItem('access_token')
-            localStorage.removeItem('refresh_token')
+            localStorage.removeItem(accessTokenKey)
+            localStorage.removeItem(tokenKey)
             ElMessage.error('登录已过期，请重新登录')
-            window.location.href = '/login'
+            window.location.href = isAdminPath ? '/admin-login' : '/login'
           }
           break
 

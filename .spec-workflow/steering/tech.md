@@ -224,13 +224,35 @@ REST API + Async Processing
 
 ### Security & Compliance
 
-- **认证方案** - JWT token，支持刷新令牌
+- **认证方案** - JWT token（双Token独立存储），支持刷新令牌
+  - 使用 `admin_access_token` / `admin_refresh_token` 隔离管理员身份
+  - 使用 `client_access_token` / `client_refresh_token` 隔离客户端身份
+  - 两个身份体系独立运行，防止权限污染
+  - Token 有效期：Access Token 30分钟，Refresh Token 7天（后端配置）
+
 - **密码存储** - bcrypt 哈希，不存储明文密码
-- **API 安全** - CORS 配置，CSRF 保护
+
+- **API 安全**
+  - CORS 配置，仅允许同域名请求
+  - CSRF 保护：Token-based 防御
+  - 请求拦截器自动补充 Authorization 头
+  - 401 错误自动刷新 token 并重试请求
+
+- **跨身份认证安全**
+  - 前端路由守卫确保用户访问正确的登录页面
+  - 管理员路由（`/admin/*`）仅接受 `admin_access_token`
+  - 客户端路由（`/reports/*` 等）仅接受 `client_access_token`
+  - 不同身份的 token 不可互换
+
 - **HTTPS** - 生产环境必须使用 HTTPS
+  - 防止 Token 在传输过程中被拦截
+  - 特别重要：localStorage 中的 Token 在 HTTP 下容易被 XSS 窃取
+
 - **SQL 注入防护** - SQLAlchemy ORM 参数化查询
+
 - **XSS 防护** - Vue 模板自动转义，HTTP 响应头配置
-- **数据保护** - 敏感数据不在日志中记录
+
+- **数据保护** - 敏感数据不在日志中记录，Token 不在页面加载时显示
 
 ### Scalability & Reliability
 
@@ -262,10 +284,29 @@ REST API + Async Processing
    - 备选方案：Tortoise ORM（异步）、Peewee（轻量）
    - 权衡：选择成熟度高、文档完善的方案
 
-4. **JWT 认证**
+4. **JWT 认证（双Token独立存储）**
    - 选择理由：无状态、易扩展、支持分布式，特别适合前后端分离
    - 备选方案：Session（有状态，扩展性差）、OAuth（功能过重）
    - 权衡：简单高效，满足当前需求
+
+   **双Token独立存储架构说明：**
+   - **adminToken 系统**：用于管理员后台访问
+     - `admin_access_token` - 有效期短（如30分钟），用于 API 请求认证
+     - `admin_refresh_token` - 有效期长（如7天），用于获取新的 access token
+     - 存储在 localStorage 中：`admin_access_token` 和 `admin_refresh_token`
+
+   - **clientToken 系统**：用于普通客户端用户访问
+     - `client_access_token` - 有效期短（如30分钟），用于 API 请求认证
+     - `client_refresh_token` - 有效期长（如7天），用于获取新的 access token
+     - 存储在 localStorage 中：`client_access_token` 和 `client_refresh_token`
+
+   - **跨身份认证支持**：用户可以在保持一个身份登录的同时，切换到另一个身份进行认证
+     - 例如：客户端用户访问 `/admin` 时，重定向到 `/admin-login` 可在同一浏览器中添加管理员身份
+     - 两个 token 可以同时存在，允许用户在两个身份间快速切换
+
+   - **前端请求拦截**：
+     - 登录/刷新 token 时：直接使用 fetch 指定正确的 token
+     - 普通 API 请求时：根据 URL 路径判断（包含 `/admin` 使用 admin token，否则使用 client token）
 
 5. **SQLite 初期存储**
    - 选择理由：零配置，无依赖，适合开发和小型应用
