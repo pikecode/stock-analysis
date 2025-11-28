@@ -72,9 +72,9 @@ class Subscription(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    user = relationship("User", foreign_keys=[user_id], backref="subscriptions")
+    user = relationship("User", foreign_keys=[user_id], back_populates="subscriptions")
     plan = relationship("Plan", back_populates="subscriptions")
-    creator = relationship("User", foreign_keys=[created_by])
+    creator = relationship("User", foreign_keys=[created_by], viewonly=True)
 
     @property
     def is_valid(self) -> bool:

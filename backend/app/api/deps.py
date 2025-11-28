@@ -78,12 +78,12 @@ def get_optional_user(
         return None
 
 
-def require_role(required_roles: List[str]):
+def require_role(required_roles):
     """
     权限检查装饰器工厂：检查用户是否拥有指定的角色。
 
     Args:
-        required_roles: 允许访问的角色列表，如 ['admin', 'customer']
+        required_roles: 允许访问的角色(s)。可以是字符串或字符串列表，如 'admin' 或 ['admin']
 
     Returns:
         一个依赖函数，用于 FastAPI 路由
@@ -91,46 +91,24 @@ def require_role(required_roles: List[str]):
     Raises:
         HTTPException: 如果用户没有所需的角色
     """
+    # 将 required_roles 转换为列表(如果是字符串)
+    if isinstance(required_roles, str):
+        roles_list = [required_roles]
+    else:
+        roles_list = required_roles
+
+    # 将所有角色转换为大写
+    roles_list = [role.upper() for role in roles_list]
+
     async def check_role(
         current_user: User = Depends(get_current_user),
     ) -> User:
-        user_roles = [role.name for role in current_user.roles]
-        if not any(role in user_roles for role in required_roles):
+        user_role = current_user.role.value.upper()
+        if user_role not in roles_list:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required roles: {', '.join(required_roles)}",
+                detail=f"Insufficient permissions. Required role: {', '.join(roles_list)}",
             )
         return current_user
 
     return check_role
-
-
-def require_permission(required_permission: str):
-    """
-    权限检查装饰器工厂：检查用户是否拥有指定的权限。
-
-    Args:
-        required_permission: 权限代码，如 'import:upload' 或 'report:view'
-
-    Returns:
-        一个依赖函数，用于 FastAPI 路由
-
-    Raises:
-        HTTPException: 如果用户没有所需的权限
-    """
-    async def check_permission(
-        current_user: User = Depends(get_current_user),
-    ) -> User:
-        user_permissions = []
-        for role in current_user.roles:
-            for permission in role.permissions:
-                user_permissions.append(permission.code)
-
-        if required_permission not in user_permissions:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required: {required_permission}",
-            )
-        return current_user
-
-    return check_permission

@@ -13,7 +13,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
-from app.models.user import User, Role
+from app.models.user import User, UserRole
 from app.schemas.user import (
     LoginRequest,
     RefreshTokenRequest,
@@ -105,13 +105,6 @@ async def logout(current_user: User = Depends(get_current_user)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user info."""
-    # Get all permissions from user's roles
-    permissions = []
-    for role in current_user.roles:
-        for permission in role.permissions:
-            if permission.code not in permissions:
-                permissions.append(permission.code)
-
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
@@ -120,8 +113,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         avatar_url=current_user.avatar_url,
         status=current_user.status,
         created_at=current_user.created_at,
-        roles=[role.name for role in current_user.roles],
-        permissions=permissions,
+        role=current_user.role.value,
     )
 
 
@@ -141,17 +133,13 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered",
         )
 
-    # Create user
+    # Create user with default role "normal"
     user = User(
         username=user_data.username,
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
+        role=UserRole.NORMAL,
     )
-
-    # Assign default role
-    viewer_role = db.query(Role).filter(Role.name == "viewer").first()
-    if viewer_role:
-        user.roles.append(viewer_role)
 
     db.add(user)
     db.commit()
@@ -165,5 +153,5 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         avatar_url=user.avatar_url,
         status=user.status,
         created_at=user.created_at,
-        roles=[role.name for role in user.roles],
+        role=user.role.value,
     )

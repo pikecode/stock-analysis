@@ -115,6 +115,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import request from '@/api/request'
 
 interface Plan {
   id: number
@@ -165,63 +166,11 @@ const formRules = {
 
 const loadPlans = async () => {
   try {
-    // 使用模拟数据
-    plans.value = [
-      {
-        id: 1,
-        name: 'monthly',
-        display_name: '月度套餐',
-        description: '月度订阅，享受所有报表功能',
-        price: 99,
-        original_price: 129,
-        duration_days: 30,
-        is_active: true,
-        sort_order: 1,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 2,
-        name: 'quarterly',
-        display_name: '季度套餐',
-        description: '季度订阅，性价比更优',
-        price: 249,
-        original_price: 349,
-        duration_days: 90,
-        is_active: true,
-        sort_order: 2,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 3,
-        name: 'semi_annual',
-        display_name: '半年度套餐',
-        description: '半年度订阅，综合优势',
-        price: 579,
-        original_price: 749,
-        duration_days: 180,
-        is_active: true,
-        sort_order: 3,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 4,
-        name: 'yearly',
-        display_name: '年度套餐',
-        description: '年度订阅，折扣力度最大',
-        price: 699,
-        original_price: 1000,
-        duration_days: 365,
-        is_active: true,
-        sort_order: 4,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-    ]
+    const data = await request.get<any, Plan[]>('/plans/admin/all')
+    plans.value = data
   } catch (error) {
     ElMessage.error('加载套餐列表失败')
+    console.error(error)
   }
 }
 
@@ -252,23 +201,28 @@ const handleSavePlan = async () => {
   await formRef.value.validate()
   try {
     if (editingPlan.value) {
+      await request.put(`/plans/admin/${editingPlan.value.id}`, formData.value)
       ElMessage.success('套餐更新成功')
     } else {
+      await request.post('/plans/admin', formData.value)
       ElMessage.success('套餐创建成功')
     }
     dialogVisible.value = false
     await loadPlans()
   } catch (error) {
     ElMessage.error('操作失败，请重试')
+    console.error(error)
   }
 }
 
 const handleDeletePlan = async (planId: number) => {
   try {
+    await request.delete(`/plans/admin/${planId}`)
     ElMessage.success('套餐删除成功')
     await loadPlans()
   } catch (error) {
     ElMessage.error('删除失败，请重试')
+    console.error(error)
   }
 }
 

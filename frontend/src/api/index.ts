@@ -217,6 +217,12 @@ export const usersApi = {
   getUser(userId: number) {
     return request.get<any, any>(`/users/admin/${userId}`)
   },
+  createUser(data: any) {
+    return request.post<any, any>('/users/admin', data)
+  },
+  updateUser(userId: number, data: any) {
+    return request.put<any, any>(`/users/admin/${userId}`, data)
+  },
   deleteUser(userId: number) {
     return request.delete<any, any>(`/users/admin/${userId}`)
   },

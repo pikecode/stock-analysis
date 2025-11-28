@@ -19,8 +19,7 @@
 ```
 ┌─────────────────────────────────────────────────┐
 │ 用户认证系统                                     │
-│ (users, roles, permissions, user_roles,         │
-│  role_permissions)                              │
+│ (users, subscriptions, subscription_logs)       │
 └─────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────┐
@@ -54,7 +53,7 @@
 ### 1. 用户认证系统
 
 #### users（用户表）
-存储用户账号信息，支持多角色。
+存储用户账号信息，采用单一角色枚举设计。
 
 | 字段 | 类型 | 说明 | 约束 |
 |------|------|------|------|
@@ -64,61 +63,46 @@
 | password_hash | VARCHAR(255) | 密码哈希 | NOT NULL |
 | phone | VARCHAR(20) | 电话 | - |
 | avatar_url | VARCHAR(255) | 头像URL | - |
+| role | ENUM | 用户角色 | NOT NULL，默认 'NORMAL' |
 | status | VARCHAR(20) | 状态 | 默认 'active' |
 | created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
 | updated_at | TIMESTAMP | 更新时间 | 自动更新 |
 | last_login_at | TIMESTAMP | 最后登录时间 | - |
 
-**关系**：多对多 → roles（通过 user_roles 表）
+**角色类型（ENUM）**：
+- `ADMIN` - 管理员，全系统访问权限
+- `VIP` - VIP付费用户，访问分析报表和个人功能
+- `NORMAL` - 普通用户，只读访问公开数据
 
-#### roles（角色表）
-定义系统中的角色。
+**设计说明**：
+- 采用 PostgreSQL ENUM 类型存储角色
+- 每个用户只有一个角色（不支持多角色）
+- 角色值为大写英文字符串（ADMIN, VIP, NORMAL）
+- 简化了旧的多对多角色关系，提高查询效率
 
-| 字段 | 类型 | 说明 | 约束 |
-|------|------|------|------|
-| id | INTEGER | 主键 | PK |
-| name | VARCHAR(50) | 角色代码 | UNIQUE, NOT NULL |
-| display_name | VARCHAR(100) | 角色显示名 | NOT NULL |
-| description | VARCHAR(255) | 角色描述 | - |
-| created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
-
-**系统内置角色**：
-- `admin` - 管理员，全系统访问权限
-- `customer` - 客户，访问分析报表和个人功能
-- `public` - 公开用户，只读访问公开数据
-
-#### permissions（权限表）
-细粒度权限定义。
+#### subscriptions（订阅表）
+用户订阅信息。
 
 | 字段 | 类型 | 说明 | 约束 |
 |------|------|------|------|
 | id | INTEGER | 主键 | PK |
-| code | VARCHAR(100) | 权限代码 | UNIQUE, NOT NULL |
-| name | VARCHAR(100) | 权限名称 | UNIQUE, NOT NULL |
-| resource | VARCHAR(50) | 资源名 | NOT NULL |
-| action | VARCHAR(20) | 操作（read/write/delete） | NOT NULL |
-| description | VARCHAR(255) | 权限描述 | - |
+| user_id | INTEGER | 用户ID | FK → users |
+| plan_id | INTEGER | 订阅计划ID | FK → plans |
+| is_valid | BOOLEAN | 是否有效 | 默认 true |
+| valid_until | TIMESTAMP | 有效期至 | - |
 | created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
+| updated_at | TIMESTAMP | 更新时间 | 自动更新 |
 
-**例子**：
-- code: `stocks.read`, resource: `stocks`, action: `read` → 查看股票
-- code: `imports.write`, resource: `imports`, action: `write` → 上传数据
+#### subscription_logs（订阅日志表）
+记录订阅变更历史。
 
-#### user_roles（用户-角色关联）
-多对多关系表。
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| user_id | INTEGER | 用户ID (FK) |
-| role_id | INTEGER | 角色ID (FK) |
-
-#### role_permissions（角色-权限关联）
-多对多关系表。
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| role_id | INTEGER | 角色ID (FK) |
-| permission_id | INTEGER | 权限ID (FK) |
+| 字段 | 类型 | 说明 | 约束 |
+|------|------|------|------|
+| id | INTEGER | 主键 | PK |
+| subscription_id | INTEGER | 订阅ID | FK → subscriptions |
+| action | VARCHAR(50) | 操作类型 | created/updated/deleted |
+| valid_until | TIMESTAMP | 有效期 | - |
+| created_at | TIMESTAMP | 操作时间 | 默认当前时间 |
 
 ---
 
@@ -138,6 +122,25 @@
 | updated_at | TIMESTAMP | 更新时间 | 自动更新 |
 
 **索引**：stock_code, exchange_prefix
+
+**例子**：
+```
+stock_code=600000, stock_name=浦发银行, exchange_prefix=SH
+stock_code=000001, stock_name=平安银行, exchange_prefix=SZ
+```
+
+#### concepts（概念/板块表）
+存储股票概念分类（也称"板块"、"题材"）。
+
+| 字段 | 类型 | 说明 | 约束 |
+|------|------|------|------|
+| id | INTEGER | 主键 | PK |
+| concept_name | VARCHAR(100) | 概念名称 | UNIQUE, NOT NULL |
+| category | VARCHAR(50) | 分类 | - |
+| description | TEXT | 概念描述 | - |
+| created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
+
+**索引**：concept_name
 
 **例子**：
 ```
@@ -583,7 +586,39 @@ trade_value排序：
 
 ## 关键概念解释
 
-### 1. trade_value 的含义
+### 1. 用户角色系统设计演变
+
+#### 旧设计（已弃用）
+系统早期采用多对多的角色权限设计：
+- **roles** 表：定义角色（admin, customer, public）
+- **permissions** 表：定义细粒度权限（stocks.read, imports.write等）
+- **user_roles** 表：用户-角色多对多关系
+- **role_permissions** 表：角色-权限多对多关系
+
+**缺点**：
+- ❌ 过度设计：简单的三角色系统不需要如此复杂的权限管理
+- ❌ 性能开销：查询用户角色需要多次JOIN
+- ❌ 维护复杂：角色和权限的关系难以维护
+
+#### 新设计（现行）- 2025年11月
+迁移到简化的单一角色枚举设计：
+- **users** 表的 `role` 字段：存储 ENUM 类型的角色
+- **允许的角色值**：ADMIN, VIP, NORMAL
+- **直接关联**：用户-角色一对一关系
+
+**优点**：
+- ✅ 简洁：直接在 users 表存储角色，无需额外表
+- ✅ 高效：直接访问 users.role，O(1) 查询时间
+- ✅ 类型安全：ENUM 保证值的一致性
+
+#### 迁移步骤（已完成）
+1. 在 users 表添加 role ENUM 字段，默认值为 'NORMAL'
+2. 迁移现有数据：从 user_roles 表同步角色到 users.role
+3. 更新后端 API 逻辑：使用新的 UserRole 枚举
+4. 更新前端认证检查：对标大写角色值 (ADMIN, VIP, NORMAL)
+5. 删除旧表：user_roles, role_permissions, roles, permissions
+
+### 2. trade_value 的含义
 
 **常见误解**：
 - ❌ trade_value = "股票在概念下的交易量"

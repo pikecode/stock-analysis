@@ -9,22 +9,35 @@ export const useAuthStore = defineStore('auth', () => {
   const subscription = ref<any>(null)
 
   const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
-  const isAdmin = computed(() => user.value?.roles.includes('admin') ?? false)
-  const isCustomer = computed(() => user.value?.roles.includes('customer') ?? false)
-  const roles = computed(() => user.value?.roles ?? [])
-  const permissions = computed(() => user.value?.permissions ?? [])
+  const isAdmin = computed(() => user.value?.role === 'ADMIN')
+  const isVip = computed(() => user.value?.role === 'VIP')
+  const isCustomer = computed(() => user.value?.role === 'VIP' || user.value?.role === 'NORMAL')
+  const role = computed(() => user.value?.role ?? null)
   const hasValidSubscription = computed(() => subscription.value?.is_valid ?? false)
   const subscriptionDaysRemaining = computed(() => subscription.value?.days_remaining ?? 0)
 
   async function login(credentials: LoginRequest) {
+    console.log('🟠 [Auth Store] login() 被调用，凭证:', { username: credentials.username })
     loading.value = true
     try {
+      console.log('🟠 [Auth Store] 正在调用 authApi.login()...')
       const res = await authApi.login(credentials)
+      console.log('🟠 [Auth Store] authApi.login() 返回:', res)
+
       localStorage.setItem('access_token', res.access_token)
       localStorage.setItem('refresh_token', res.refresh_token)
+      console.log('🟠 [Auth Store] Token已保存到localStorage')
+
       await fetchUser()
+      console.log('🟠 [Auth Store] 用户信息已加载:', user.value)
       return true
-    } catch (error) {
+    } catch (error: any) {
+      console.error('🟠 [Auth Store] 登录异常:', error)
+      console.error('🟠 [Auth Store] 错误详情:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      })
       return false
     } finally {
       loading.value = false
@@ -63,34 +76,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 检查是否拥有指定的角色
-  function hasRole(role: string): boolean {
-    return roles.value.includes(role)
+  // 检查是否拥有指定的角色 (不区分大小写)
+  function hasRole(requiredRole: string): boolean {
+    return role.value?.toUpperCase() === requiredRole.toUpperCase()
   }
 
-  // 检查是否拥有指定的权限
-  function hasPermission(permission: string): boolean {
-    return permissions.value.includes(permission)
-  }
-
-  // 检查是否拥有所有指定的角色
-  function hasAllRoles(roleList: string[]): boolean {
-    return roleList.every(role => roles.value.includes(role))
-  }
-
-  // 检查是否拥有任意一个指定的角色
+  // 检查是否拥有任意一个指定的角色 (不区分大小写)
   function hasAnyRole(roleList: string[]): boolean {
-    return roleList.some(role => roles.value.includes(role))
-  }
-
-  // 检查是否拥有所有指定的权限
-  function hasAllPermissions(permissionList: string[]): boolean {
-    return permissionList.every(perm => permissions.value.includes(perm))
-  }
-
-  // 检查是否拥有任意一个指定的权限
-  function hasAnyPermission(permissionList: string[]): boolean {
-    return permissionList.some(perm => permissions.value.includes(perm))
+    const currentRole = role.value?.toUpperCase() ?? ''
+    return roleList.map(r => r.toUpperCase()).includes(currentRole)
   }
 
   return {
@@ -99,9 +93,9 @@ export const useAuthStore = defineStore('auth', () => {
     subscription,
     isLoggedIn,
     isAdmin,
+    isVip,
     isCustomer,
-    roles,
-    permissions,
+    role,
     hasValidSubscription,
     subscriptionDaysRemaining,
     login,
@@ -109,10 +103,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchUser,
     fetchSubscription,
     hasRole,
-    hasPermission,
-    hasAllRoles,
     hasAnyRole,
-    hasAllPermissions,
-    hasAnyPermission,
   }
 })

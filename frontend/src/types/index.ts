@@ -6,8 +6,7 @@ export interface User {
   phone?: string
   avatar_url?: string
   status: string
-  roles: string[]
-  permissions: string[]
+  role: 'admin' | 'vip' | 'normal'
 }
 
 export interface LoginRequest {

@@ -99,13 +99,21 @@ async def list_subscriptions(
 
     subscriptions = query.order_by(Subscription.created_at.desc()).all()
 
-    # Convert to response with plan
+    # Convert to response with plan and user info
     result = []
     for sub in subscriptions:
         response = SubscriptionDetailResponse.model_validate(sub)
+
+        # Add plan info if exists
         if sub.plan_id:
             plan = db.query(Plan).filter(Plan.id == sub.plan_id).first()
             response.plan = plan
+
+        # Add user info
+        user = db.query(User).filter(User.id == sub.user_id).first()
+        if user:
+            response.username = user.username
+
         result.append(response)
 
     return result

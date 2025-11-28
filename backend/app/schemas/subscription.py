@@ -134,3 +134,4 @@ class SubscriptionDetailResponse(SubscriptionResponse):
     """Subscription detail response with plan info."""
 
     plan: Optional[PlanResponse] = None
+    username: Optional[str] = None  # User's username

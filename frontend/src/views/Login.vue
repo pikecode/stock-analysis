@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores'
@@ -13,6 +13,14 @@ const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 
+// 页面加载时输出调试信息
+onMounted(() => {
+  console.clear()
+  console.log('%c✅ Login 页面已加载', 'color: green; font-size: 14px; font-weight: bold;')
+  console.log('当前路由:', route.path)
+  console.log('authStore 已初始化')
+})
+
 const form = reactive({
   username: '',
   password: '',
@@ -24,30 +32,44 @@ const rules: FormRules = {
 }
 
 const handleLogin = async () => {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  console.log('🔵 handleLogin 被调用了!')
+
+  // 最基础的检查
+  if (!form.username) {
+    console.warn('❌ 用户名为空')
+    ElMessage.warning('请输入用户名')
+    return
+  }
+  if (!form.password) {
+    console.warn('❌ 密码为空')
+    ElMessage.warning('请输入密码')
+    return
+  }
+
+  console.log('✓ 表单数据有效:', { username: form.username })
 
   loading.value = true
+
   try {
+    console.log('➡️ 开始调用 authStore.login()...')
     const success = await authStore.login(form)
+    console.log('⬅️ authStore.login() 返回:', success)
+
     if (success) {
+      console.log('✅ 登录成功！')
       ElMessage.success('登录成功')
 
-      // 根据用户角色重定向
-      let redirect = (route.query.redirect as string)
-      if (!redirect) {
-        if (authStore.isAdmin) {
-          redirect = '/admin'
-        } else if (authStore.isCustomer) {
-          redirect = '/reports'
-        } else {
-          redirect = '/'
-        }
-      }
+      // 重定向
+      const redirect = authStore.isAdmin ? '/admin' : authStore.isCustomer ? '/reports' : '/'
+      console.log('📍 重定向到:', redirect)
       router.push(redirect)
     } else {
+      console.log('❌ 登录失败')
       ElMessage.error('用户名或密码错误')
     }
+  } catch (error: any) {
+    console.error('💥 异常:', error)
+    ElMessage.error('登录失败: ' + (error?.message || '请稍后重试'))
   } finally {
     loading.value = false
   }
@@ -60,9 +82,26 @@ const handleLogin = async () => {
       <h2 class="login-title">Stock Analysis</h2>
       <p class="login-subtitle">股票概念分析系统</p>
 
-      <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="handleLogin">
+      <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; border-radius: 4px; background: #f5f7fa;">
+        <p style="font-size: 12px; color: #666; margin: 0 0 8px;">
+          📝 测试凭证：
+        </p>
+        <p style="font-size: 12px; color: #666; margin: 0 0 4px;">
+          • 用户名: <code>admin</code>  密码: <code>Admin@123</code>
+        </p>
+        <p style="font-size: 12px; color: #666; margin: 0;">
+          • 用户名: <code>customer</code>  密码: <code>customer123</code>
+        </p>
+      </div>
+
+      <el-form ref="formRef" :model="form" :rules="rules">
         <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" size="large" />
+          <el-input
+            v-model="form.username"
+            placeholder="用户名"
+            :prefix-icon="User"
+            size="large"
+          />
         </el-form-item>
         <el-form-item prop="password">
           <el-input
@@ -82,10 +121,16 @@ const handleLogin = async () => {
             class="login-btn"
             @click="handleLogin"
           >
-            登录
+            {{ loading ? '登录中...' : '登录' }}
           </el-button>
         </el-form-item>
       </el-form>
+
+      <div style="margin-top: 15px; padding: 10px; background: #f0f9ff; border: 1px solid #b3d8ff; border-radius: 4px;">
+        <p style="font-size: 11px; color: #0066cc; margin: 0;">
+          💡 打开浏览器开发者工具（F12）→ Console 标签，可以看到登录过程的详细日志
+        </p>
+      </div>
     </div>
   </div>
 </template>
