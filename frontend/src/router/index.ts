@@ -50,7 +50,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/reports',
     component: () => import('@/layouts/ClientLayout.vue'),
-    meta: { requiresAuth: true, requiredRole: 'customer' },
+    meta: { requiresAuth: true, requiredRole: 'customer', requiresSubscription: true },
     children: [
       {
         path: '',
@@ -82,7 +82,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/analysis',
     component: () => import('@/layouts/ClientLayout.vue'),
-    meta: { requiresAuth: true, requiredRole: 'customer' },
+    meta: { requiresAuth: true, requiredRole: 'customer', requiresSubscription: true },
     children: [
       {
         path: 'portfolio',
@@ -185,6 +185,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '用户管理' },
       },
       {
+        path: 'plans',
+        name: 'AdminPlans',
+        component: () => import('@/views/admin/PlanManagement.vue'),
+        meta: { title: '套餐管理' },
+      },
+      {
+        path: 'subscriptions',
+        name: 'AdminSubscriptions',
+        component: () => import('@/views/admin/SubscriptionManagement.vue'),
+        meta: { title: '订阅管理' },
+      },
+      {
         path: 'settings',
         name: 'AdminSettings',
         component: () => import('@/views/settings/AdminSettings.vue'),
@@ -205,6 +217,12 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminLogin',
     component: () => import('@/views/AdminLogin.vue'),
     meta: { requiresAuth: false, title: '管理员登录' },
+  },
+  {
+    path: '/subscription-expired',
+    name: 'SubscriptionExpired',
+    component: () => import('@/views/SubscriptionExpired.vue'),
+    meta: { requiresAuth: false, title: '订阅已过期' },
   },
 
   // ========== 404 页面 ==========
@@ -251,6 +269,8 @@ router.beforeEach((to, _from, next) => {
 
   // 3. 角色权限检查
   const requiredRole = to.meta.requiredRole as string | undefined
+  const requiresSubscription = to.meta.requiresSubscription as boolean | undefined
+
   if (requiredRole && token) {
     // 确保用户信息已加载
     if (!authStore.user) {
@@ -264,6 +284,10 @@ router.beforeEach((to, _from, next) => {
             // 客户端角色不足，重定向到公开页面
             next({ path: '/' })
           }
+        } else if (requiresSubscription && !authStore.hasValidSubscription) {
+          // 需要订阅但订阅已过期
+          console.warn('User subscription expired or invalid')
+          next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
         } else {
           next()
         }
@@ -283,6 +307,12 @@ router.beforeEach((to, _from, next) => {
     if (!authStore.hasRole(requiredRole)) {
       console.warn(`User does not have required role: ${requiredRole}`)
       next({ path: '/' })
+      return
+    }
+
+    if (requiresSubscription && !authStore.hasValidSubscription) {
+      console.warn('User subscription expired or invalid')
+      next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
       return
     }
   }

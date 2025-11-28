@@ -11,6 +11,8 @@ import {
   User,
   SwitchButton,
   Setting,
+  UserFilled,
+  Tickets,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -24,6 +26,9 @@ const activeMenu = computed(() => {
   if (path.startsWith('/admin/rankings')) return '/admin/rankings'
   if (path.startsWith('/admin/import')) return '/admin/import'
   if (path.startsWith('/admin/settings')) return '/admin/settings'
+  if (path.startsWith('/admin/users')) return '/admin/users'
+  if (path.startsWith('/admin/plans')) return '/admin/plans'
+  if (path.startsWith('/admin/subscriptions')) return '/admin/subscriptions'
   return path
 })
 
@@ -71,6 +76,26 @@ const handleLogout = async () => {
           <el-menu-item index="/admin/import/batches">
             <el-icon><List /></el-icon>
             导入记录
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 用户与订阅管理 -->
+        <el-sub-menu index="/admin/users">
+          <template #title>
+            <el-icon><UserFilled /></el-icon>
+            <span>👥 用户管理</span>
+          </template>
+          <el-menu-item index="/admin/users">
+            <el-icon><UserFilled /></el-icon>
+            用户列表
+          </el-menu-item>
+          <el-menu-item index="/admin/plans">
+            <el-icon><Tickets /></el-icon>
+            套餐管理
+          </el-menu-item>
+          <el-menu-item index="/admin/subscriptions">
+            <el-icon><List /></el-icon>
+            订阅管理
           </el-menu-item>
         </el-sub-menu>
 

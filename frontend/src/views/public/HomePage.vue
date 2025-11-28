@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, TrendCharts, DataAnalysis, DocumentCopy } from '@element-plus/icons-vue'
+import { Search, TrendCharts, DataAnalysis, DocumentCopy, Check } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const searchValue = ref('')
+const plans = ref<any[]>([])
 
 // 快速搜索
 const handleSearch = () => {
@@ -16,6 +17,24 @@ const handleSearch = () => {
 // 导航到功能页面
 const navigateTo = (name: string) => {
   router.push({ name })
+}
+
+// 购买套餐
+const handleBuyPlan = (plan: any) => {
+  router.push({ name: 'Login' })
+}
+
+// 加载套餐数据
+const loadPlans = async () => {
+  try {
+    const response = await fetch('/api/v1/plans')
+    if (response.ok) {
+      const data = await response.json()
+      plans.value = data.sort((a: any, b: any) => a.sort_order - b.sort_order)
+    }
+  } catch (error) {
+    console.error('Failed to load plans:', error)
+  }
 }
 
 // 热门概念数据（模拟）
@@ -32,6 +51,10 @@ const topStocks = ref([
   { code: '000858', name: '五粮液', change: 4.8 },
   { code: '002415', name: '海康威视', change: 3.6 },
 ])
+
+onMounted(() => {
+  loadPlans()
+})
 </script>
 
 <template>
@@ -148,13 +171,73 @@ const topStocks = ref([
       </div>
     </section>
 
+    <!-- 套餐价格区域 -->
+    <section class="pricing-section">
+      <div class="container">
+        <h2>选择适合您的套餐</h2>
+        <p>解锁专业分析功能，享受实时数据和深度报表</p>
+        <div class="pricing-grid">
+          <div
+            v-for="plan in plans"
+            :key="plan.id"
+            class="pricing-card"
+            :class="{ featured: plan.name === 'yearly' }"
+          >
+            <div v-if="plan.original_price" class="discount-badge">
+              {{ Math.round((1 - parseFloat(plan.price) / parseFloat(plan.original_price)) * 100) }}% 折扣
+            </div>
+            <h3>{{ plan.display_name }}</h3>
+            <div class="price">
+              <span class="currency">¥</span>
+              <span class="amount">{{ parseInt(plan.price) }}</span>
+              <span class="period">/{{ plan.duration_days }}天</span>
+            </div>
+            <p v-if="plan.original_price" class="original-price">
+              原价: ¥{{ parseInt(plan.original_price) }}
+            </p>
+            <p class="description">{{ plan.description }}</p>
+            <div class="features">
+              <div class="feature-item">
+                <el-icon><Check /></el-icon>
+                <span>{{ plan.duration_days }}天有效期</span>
+              </div>
+              <div class="feature-item">
+                <el-icon><Check /></el-icon>
+                <span>每日实时数据更新</span>
+              </div>
+              <div class="feature-item">
+                <el-icon><Check /></el-icon>
+                <span>专业分析报表</span>
+              </div>
+              <div class="feature-item">
+                <el-icon><Check /></el-icon>
+                <span>概念板块深度分析</span>
+              </div>
+              <div v-if="plan.name !== 'monthly'" class="feature-item">
+                <el-icon><Check /></el-icon>
+                <span>数据导出功能</span>
+              </div>
+            </div>
+            <el-button
+              :type="plan.name === 'yearly' ? 'primary' : 'default'"
+              size="large"
+              class="buy-button"
+              @click="handleBuyPlan(plan)"
+            >
+              现在购买
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 底部 CTA -->
     <section class="cta">
       <div class="container">
-        <h2>解锁更多专业功能</h2>
-        <p>注册账号，免费使用专业分析报表和深度数据</p>
-        <el-button type="primary" size="large" @click="navigateTo('Login')">
-          立即注册
+        <h2>有任何疑问？</h2>
+        <p>我们提供专业的客户支持团队，随时准备帮助您</p>
+        <el-button type="primary" size="large" @click="navigateTo('About')">
+          联系我们
         </el-button>
       </div>
     </section>
@@ -629,6 +712,202 @@ const topStocks = ref([
 
   .stock-change {
     font-size: 15px;
+  }
+}
+
+/* 套餐价格区域 */
+.pricing-section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f2f5 100%);
+  padding: 60px 20px;
+}
+
+.pricing-section h2 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  text-align: center;
+  color: #303133;
+}
+
+.pricing-section > .container > p {
+  text-align: center;
+  color: #909399;
+  margin-bottom: 40px;
+  font-size: 15px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.pricing-card {
+  background: white;
+  border-radius: 10px;
+  padding: 32px 24px;
+  position: relative;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-card.featured {
+  border: 2px solid #409EFF;
+  transform: scale(1.05);
+  box-shadow: 0 12px 24px rgba(64, 158, 255, 0.2);
+}
+
+.discount-badge {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  background: #f56c6c;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.pricing-card h3 {
+  font-size: 20px;
+  margin-bottom: 16px;
+  color: #303133;
+}
+
+.price {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.currency {
+  font-size: 18px;
+  color: #606266;
+}
+
+.amount {
+  font-size: 40px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.period {
+  font-size: 14px;
+  color: #909399;
+}
+
+.original-price {
+  font-size: 13px;
+  color: #909399;
+  text-decoration: line-through;
+  margin-bottom: 12px;
+}
+
+.description {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.features {
+  margin-bottom: 24px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #606266;
+  padding: 8px 0;
+}
+
+.feature-item :deep(.el-icon) {
+  color: #67C23A;
+  flex-shrink: 0;
+}
+
+.buy-button {
+  width: 100%;
+}
+
+/* 平板设备 */
+@media (min-width: 768px) {
+  .pricing-section {
+    padding: 80px 20px;
+  }
+
+  .pricing-section h2 {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .pricing-card {
+    padding: 36px 28px;
+  }
+
+  .pricing-card.featured {
+    grid-column: span 2;
+    max-width: 50%;
+    margin: 0 auto;
+  }
+}
+
+/* PC 设备 */
+@media (min-width: 1024px) {
+  .pricing-section {
+    padding: 100px 20px;
+  }
+
+  .pricing-section h2 {
+    font-size: 36px;
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+  }
+
+  .pricing-card {
+    padding: 40px 28px;
+  }
+
+  .pricing-card.featured {
+    grid-column: span 1;
+    max-width: 100%;
+    transform: scale(1.08);
+  }
+
+  .price {
+    margin-bottom: 16px;
+  }
+
+  .amount {
+    font-size: 44px;
+  }
+
+  .description {
+    margin-bottom: 24px;
+  }
+
+  .features {
+    margin-bottom: 32px;
+  }
+
+  .feature-item {
+    padding: 10px 0;
+    font-size: 14px;
   }
 }
 

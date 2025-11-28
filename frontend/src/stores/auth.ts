@@ -1,17 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authApi } from '@/api'
+import { authApi, subscriptionApi } from '@/api'
 import type { User, LoginRequest } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
+  const subscription = ref<any>(null)
 
   const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
   const isAdmin = computed(() => user.value?.roles.includes('admin') ?? false)
   const isCustomer = computed(() => user.value?.roles.includes('customer') ?? false)
   const roles = computed(() => user.value?.roles ?? [])
   const permissions = computed(() => user.value?.permissions ?? [])
+  const hasValidSubscription = computed(() => subscription.value?.is_valid ?? false)
+  const subscriptionDaysRemaining = computed(() => subscription.value?.days_remaining ?? 0)
 
   async function login(credentials: LoginRequest) {
     loading.value = true
@@ -44,8 +47,19 @@ export const useAuthStore = defineStore('auth', () => {
     if (!localStorage.getItem('access_token')) return
     try {
       user.value = await authApi.getMe()
+      // Also fetch subscription status
+      await fetchSubscription()
     } catch {
       user.value = null
+    }
+  }
+
+  async function fetchSubscription() {
+    if (!localStorage.getItem('access_token')) return
+    try {
+      subscription.value = await subscriptionApi.checkValidity()
+    } catch {
+      subscription.value = null
     }
   }
 
@@ -82,14 +96,18 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     loading,
+    subscription,
     isLoggedIn,
     isAdmin,
     isCustomer,
     roles,
     permissions,
+    hasValidSubscription,
+    subscriptionDaysRemaining,
     login,
     logout,
     fetchUser,
+    fetchSubscription,
     hasRole,
     hasPermission,
     hasAllRoles,

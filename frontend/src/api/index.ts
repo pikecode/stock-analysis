@@ -180,3 +180,44 @@ export const reportApi = {
     return request.get<any, any>(`/rankings/stock/${stockCode}/top-n-count`, { params })
   },
 }
+
+// Subscription API
+export const subscriptionApi = {
+  checkValidity() {
+    return request.get<any, any>('/subscriptions/user/check')
+  },
+  getCurrent() {
+    return request.get<any, any>('/subscriptions/user/current')
+  },
+  create(data: any) {
+    return request.post<any, any>('/subscriptions/admin', data)
+  },
+  update(subscriptionId: number, data: any) {
+    return request.put<any, any>(`/subscriptions/admin/${subscriptionId}`, data)
+  },
+  extend(subscriptionId: number, days: number) {
+    return request.post<any, any>(`/subscriptions/admin/${subscriptionId}/extend`, null, {
+      params: { days },
+    })
+  },
+}
+
+// Plans API
+export const plansApi = {
+  getList() {
+    return request.get<any, any[]>('/plans')
+  },
+}
+
+// Users API (Admin)
+export const usersApi = {
+  listUsers(params?: { keyword?: string; status?: string }) {
+    return request.get<any, any[]>('/users/admin', { params })
+  },
+  getUser(userId: number) {
+    return request.get<any, any>(`/users/admin/${userId}`)
+  },
+  deleteUser(userId: number) {
+    return request.delete<any, any>(`/users/admin/${userId}`)
+  },
+}

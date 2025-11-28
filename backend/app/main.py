@@ -5,7 +5,7 @@ import logging
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api import auth, stocks, concepts, rankings, summaries, imports
+from app.api import auth, stocks, concepts, rankings, summaries, imports, plans, subscriptions, users
 
 # Configure logging
 logging.basicConfig(
@@ -99,6 +99,9 @@ app.include_router(concepts.router, prefix="/api/v1", tags=["Concepts"])
 app.include_router(rankings.router, prefix="/api/v1", tags=["Rankings"])
 app.include_router(summaries.router, prefix="/api/v1", tags=["Summaries"])
 app.include_router(imports.router, prefix="/api/v1", tags=["Imports"])
+app.include_router(plans.router, prefix="/api/v1", tags=["Plans"])
+app.include_router(subscriptions.router, prefix="/api/v1", tags=["Subscriptions"])
+app.include_router(users.router, prefix="/api/v1", tags=["Users"])
 
 
 # Root endpoint
