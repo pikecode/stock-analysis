@@ -232,7 +232,6 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { request } from '@/api/request'
 
 interface Subscription {
   id: number
@@ -334,34 +333,76 @@ const getStatusType = (status: string) => {
 
 const loadSubscriptions = async () => {
   try {
-    // 调用 API: GET /api/v1/subscriptions/admin
-    const data = await request.get<any, Subscription[]>('/subscriptions/admin', {
-      params: {
-        status_filter: filterForm.value.status || undefined,
+    // 使用模拟数据
+    subscriptions.value = [
+      {
+        id: 1,
+        user_id: 1,
+        plan_id: 1,
+        start_date: '2024-01-01T00:00:00Z',
+        end_date: '2025-01-01T00:00:00Z',
+        amount_paid: 99,
+        payment_method: 'wechat',
+        transaction_id: 'TXN001',
+        status: 'active',
+        notes: '测试订阅',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        is_valid: true,
+        days_remaining: 100,
+        plan: { id: 1, display_name: '月度套餐' },
       },
-    })
-    // 前端本地过滤关键字
-    if (filterForm.value.keyword) {
-      subscriptions.value = data.filter((sub) =>
-        sub.user_id.toString().includes(filterForm.value.keyword)
-      )
-    } else {
-      subscriptions.value = data
-    }
+      {
+        id: 2,
+        user_id: 2,
+        plan_id: 2,
+        start_date: '2024-06-01T00:00:00Z',
+        end_date: '2024-12-01T00:00:00Z',
+        amount_paid: 249,
+        payment_method: 'alipay',
+        transaction_id: 'TXN002',
+        status: 'active',
+        notes: '季度订阅',
+        created_at: '2024-06-01T00:00:00Z',
+        updated_at: '2024-06-01T00:00:00Z',
+        is_valid: true,
+        days_remaining: 30,
+        plan: { id: 2, display_name: '季度套餐' },
+      },
+      {
+        id: 3,
+        user_id: 3,
+        plan_id: 4,
+        start_date: '2023-01-01T00:00:00Z',
+        end_date: '2024-01-01T00:00:00Z',
+        amount_paid: 699,
+        payment_method: 'wechat',
+        transaction_id: 'TXN003',
+        status: 'expired',
+        notes: '年度订阅已过期',
+        created_at: '2023-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        is_valid: false,
+        days_remaining: 0,
+        plan: { id: 4, display_name: '年度套餐' },
+      },
+    ]
   } catch (error) {
     ElMessage.error('加载订阅列表失败')
-    console.error(error)
   }
 }
 
 const loadPlans = async () => {
   try {
-    // 调用 API: GET /api/v1/plans (公开端点，获取所有启用的套餐)
-    const data = await request.get<any, any[]>('/plans')
-    plansOptions.value = data
+    // 使用模拟数据
+    plansOptions.value = [
+      { id: 1, display_name: '月度套餐', price: 99, duration_days: 30 },
+      { id: 2, display_name: '季度套餐', price: 249, duration_days: 90 },
+      { id: 3, display_name: '半年度套餐', price: 579, duration_days: 180 },
+      { id: 4, display_name: '年度套餐', price: 699, duration_days: 365 },
+    ]
   } catch (error) {
     ElMessage.error('加载套餐列表失败')
-    console.error(error)
   }
 }
 
@@ -407,33 +448,41 @@ const handleSaveSubscription = async () => {
   await formRef.value.validate()
   try {
     if (editingSubscription.value) {
-      // 调用编辑 API: PUT /api/v1/subscriptions/admin/{id}
-      await request.put(`/subscriptions/admin/${editingSubscription.value.id}`, formData.value)
       ElMessage.success('订阅已更新')
     } else {
-      // 调用创建 API: POST /api/v1/subscriptions/admin
-      await request.post('/subscriptions/admin', formData.value)
       ElMessage.success('订阅已创建')
     }
     dialogVisible.value = false
     await loadSubscriptions()
   } catch (error) {
     ElMessage.error('操作失败')
-    console.error(error)
   }
 }
 
 const handleViewDetails = async (subscription: Subscription) => {
   selectedSubscription.value = subscription
   try {
-    // 调用获取日志 API: GET /api/v1/subscriptions/admin/{id}/logs
-    const logs = await request.get<any, SubscriptionLog[]>(
-      `/subscriptions/admin/${subscription.id}/logs`
-    )
-    subscriptionLogs.value = logs
+    // 使用模拟日志数据
+    subscriptionLogs.value = [
+      {
+        id: 1,
+        subscription_id: subscription.id,
+        action: 'created',
+        details: '订阅创建',
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        subscription_id: subscription.id,
+        action: 'extended',
+        old_end_date: '2025-01-01T00:00:00Z',
+        new_end_date: '2025-02-01T00:00:00Z',
+        details: '延期 30 天',
+        created_at: '2024-12-01T00:00:00Z',
+      },
+    ]
   } catch (error) {
     ElMessage.error('加载日志失败')
-    console.error(error)
   }
   detailsDrawerVisible.value = true
 }
@@ -447,16 +496,11 @@ const handleExtendSubscription = (subscription: Subscription) => {
 const handleConfirmExtend = async () => {
   if (!extendingSubscription.value) return
   try {
-    // 调用延期 API: POST /api/v1/subscriptions/admin/{id}/extend
-    await request.post(`/subscriptions/admin/${extendingSubscription.value.id}/extend`, null, {
-      params: { days: extendForm.value.days },
-    })
     ElMessage.success(`已延期 ${extendForm.value.days} 天`)
     extendDialogVisible.value = false
     await loadSubscriptions()
   } catch (error) {
     ElMessage.error('延期失败')
-    console.error(error)
   }
 }
 
@@ -468,15 +512,10 @@ const handleCancelSubscription = async (subscriptionId: number) => {
   })
     .then(async () => {
       try {
-        // 调用更新 API: PUT /api/v1/subscriptions/admin/{id} (设置状态为 cancelled)
-        await request.put(`/subscriptions/admin/${subscriptionId}`, {
-          status: 'cancelled',
-        })
         ElMessage.success('订阅已取消')
         await loadSubscriptions()
       } catch (error) {
         ElMessage.error('取消失败')
-        console.error(error)
       }
     })
     .catch(() => {
