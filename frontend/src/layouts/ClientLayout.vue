@@ -43,6 +43,7 @@ const activeMenu = computed(() => {
   if (path === '/reports') return '/reports'
   if (path === '/reports/concept-ranking') return '/reports/concept-ranking'
   if (path === '/reports/new-highs') return '/reports/new-highs'
+  if (path === '/convertible-bonds') return '/convertible-bonds'
   if (path === '/profile' || path.startsWith('/profile/')) return '/profile'
   // 其他 /reports 下的路径默认高亮报表总览
   if (path.startsWith('/reports')) return '/reports'
@@ -131,6 +132,12 @@ const sidebarWidth = computed(() => {
           <span>创新高分析</span>
         </el-menu-item>
 
+        <!-- 转债分析 -->
+        <el-menu-item index="/convertible-bonds">
+          <el-icon><TrendCharts /></el-icon>
+          <span>转债分析</span>
+        </el-menu-item>
+
         <!-- 用户信息 -->
         <el-menu-item index="/profile">
           <el-icon><User /></el-icon>
@@ -182,6 +189,12 @@ const sidebarWidth = computed(() => {
         <el-menu-item index="/reports/new-highs">
           <el-icon><DataAnalysis /></el-icon>
           <span>创新高分析</span>
+        </el-menu-item>
+
+        <!-- 转债分析 -->
+        <el-menu-item index="/convertible-bonds">
+          <el-icon><TrendCharts /></el-icon>
+          <span>转债分析</span>
         </el-menu-item>
 
         <!-- 用户信息 -->

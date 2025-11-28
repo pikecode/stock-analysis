@@ -211,3 +211,174 @@ async def get_concept_trend(
         }
         for summary in summaries
     ]
+
+
+class StockInNewHigh(BaseModel):
+    code: str
+    name: str
+    trade_value: float
+    price_change_pct: float
+    rank: int
+
+
+class ConvertibleBondNewHigh(BaseModel):
+    stock_code: str
+    stock_name: str
+    total_trade_value: float
+    daily_rank: int
+    is_new_high: bool
+    stocks: List[StockInNewHigh]
+
+
+@router.get("/convertible-bond-new-highs", response_model=List[ConvertibleBondNewHigh])
+async def get_convertible_bond_new_highs(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get convertible bonds (stocks starting with '1') that reached new highs.
+
+    Logic:
+    1. Find all stocks starting with '1' (convertible bonds)
+    2. Require at least 2 days of data (last day must have something to compare against)
+    3. Verify that the last record's date matches end_date exactly
+    4. Compare last day's volume against all previous days in the range
+    5. If last day > max(previous days), it's a new high bond
+    6. Return those bonds sorted by trading volume on the last day
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    # Get all stocks starting with '1' (convertible bonds)
+    bonds = db.query(Stock).filter(Stock.stock_code.startswith('1')).all()
+    results = []
+
+    for bond in bonds:
+        # Get daily summaries - we'll need to create these from daily data
+        # For now, we'll query StockConcept or similar to get daily data
+        # Since there's no direct stock daily summary, we'll use ConceptStockDailyRank
+        # But we need to think about this differently...
+
+        # Get all trading data for this bond
+        from app.models.stock import StockDailyQuote
+        try:
+            daily_quotes = (
+                db.query(StockDailyQuote)
+                .filter(
+                    and_(
+                        StockDailyQuote.stock_code == bond.stock_code,
+                        StockDailyQuote.trade_date >= start,
+                        StockDailyQuote.trade_date <= end,
+                    )
+                )
+                .order_by(StockDailyQuote.trade_date)
+                .all()
+            )
+        except:
+            # If StockDailyQuote doesn't exist, skip this bond
+            continue
+
+        # Need at least 2 days of data to compare
+        if len(daily_quotes) < 2:
+            continue
+
+        # Get the last day's data
+        last_day_quote = daily_quotes[-1]
+
+        # Verify that the last record's date matches end_date exactly
+        if last_day_quote.trade_date != end:
+            continue
+
+        last_day_value = last_day_quote.trade_volume or 0
+
+        if last_day_value == 0:
+            continue
+
+        # Calculate the maximum value from previous days (excluding last day)
+        previous_max = max(
+            (quote.trade_volume or 0) for quote in daily_quotes[:-1]
+        )
+
+        # Check if last day is strictly greater than all previous days (new high)
+        if last_day_value <= previous_max:
+            continue
+
+        # For now, we'll return a simplified structure
+        results.append(
+            ConvertibleBondNewHigh(
+                stock_code=bond.stock_code,
+                stock_name=bond.stock_name,
+                total_trade_value=last_day_value,
+                daily_rank=0,
+                is_new_high=True,
+                stocks=[],  # Convertible bonds don't have sub-stocks
+            )
+        )
+
+    # Sort by trade value descending
+    results.sort(key=lambda x: x.total_trade_value, reverse=True)
+
+    return results
+
+
+@router.get("/convertible-bond-trend/{stock_code}")
+async def get_convertible_bond_trend(
+    stock_code: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get daily trading volume trend for a convertible bond within date range.
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    from app.models.stock import StockDailyQuote
+
+    daily_quotes = (
+        db.query(StockDailyQuote)
+        .filter(
+            and_(
+                StockDailyQuote.stock_code == stock_code,
+                StockDailyQuote.trade_date >= start,
+                StockDailyQuote.trade_date <= end,
+            )
+        )
+        .order_by(StockDailyQuote.trade_date)
+        .all()
+    )
+
+    return [
+        {
+            "date": quote.trade_date.isoformat(),
+            "trade_value": quote.trade_volume or 0,
+            "is_peak": quote.trade_date == end,
+        }
+        for quote in daily_quotes
+    ]

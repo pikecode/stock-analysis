@@ -86,6 +86,20 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/convertible-bonds',
+    component: () => import('@/layouts/ClientLayout.vue'),
+    meta: { requiresAuth: true, requiredRole: 'customer', requiresSubscription: true },
+    children: [
+      {
+        path: '',
+        name: 'ConvertibleBondsAnalysis',
+        component: () => import('@/views/reports/ConvertibleBondAnalysis.vue'),
+        meta: { title: '转债分析' },
+      },
+    ],
+  },
+
+  {
     path: '/analysis',
     component: () => import('@/layouts/ClientLayout.vue'),
     meta: { requiresAuth: true, requiredRole: 'customer', requiresSubscription: true },
