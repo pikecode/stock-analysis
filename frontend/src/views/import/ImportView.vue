@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { importApi } from '@/api'
-import type { MetricType } from '@/types'
+import type { MetricType, ImportBatch } from '@/types'
 import { Upload } from '@element-plus/icons-vue'
 import type { UploadFile, UploadFiles } from 'element-plus'
 
 const loading = ref(false)
+const uploading = ref(false)
 const metrics = ref<MetricType[]>([])
+const uploadProgress = ref(0)
+const currentBatchId = ref<number | null>(null)
+const currentBatch = ref<ImportBatch | null>(null)
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 const formData = ref({
   file_type: 'TXT',
@@ -44,6 +49,73 @@ const handleFileChange = (file: UploadFile, files: UploadFiles) => {
   }
 }
 
+// Polling to check batch status
+const pollBatchStatus = async () => {
+  if (!currentBatchId.value) return
+
+  try {
+    const batch = await importApi.getBatch(currentBatchId.value)
+    currentBatch.value = batch
+
+    // Update progress based on status
+    if (batch.status === 'pending') {
+      uploadProgress.value = 20
+    } else if (batch.status === 'processing') {
+      if (batch.file_type === 'CSV') {
+        uploadProgress.value = 50
+      } else {
+        // For TXT, include compute progress
+        if (batch.compute_status === 'pending') {
+          uploadProgress.value = 50
+        } else if (batch.compute_status === 'computing') {
+          uploadProgress.value = 75
+        } else if (batch.compute_status === 'completed') {
+          uploadProgress.value = 95
+        }
+      }
+    } else if (batch.status === 'completed' || batch.status === 'success') {
+      uploadProgress.value = 100
+      stopPolling()
+      const successRows = batch.success_rows || 0
+      const totalRows = batch.total_rows || 0
+      const errorRows = batch.error_rows || 0
+      ElMessage.success(
+        `导入成功！成功: ${successRows}, 失败: ${errorRows}, 总计: ${totalRows}`
+      )
+      resetForm()
+    } else if (batch.status === 'failed') {
+      uploadProgress.value = 0
+      stopPolling()
+      const errorMsg = batch.error_message || '导入失败'
+      ElMessage.error(`导入失败: ${errorMsg}`)
+      resetForm()
+    }
+  } catch (error) {
+    console.error('轮询状态失败:', error)
+  }
+}
+
+const startPolling = () => {
+  if (pollInterval) clearInterval(pollInterval)
+  pollInterval = setInterval(pollBatchStatus, 2000) // 每2秒检查一次
+}
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+const resetForm = () => {
+  fileList.value = []
+  formData.value.metric_code = ''
+  uploading.value = false
+  currentBatchId.value = null
+  currentBatch.value = null
+  uploadProgress.value = 0
+}
+
 const handleUpload = async () => {
   if (!fileList.value.length) {
     ElMessage.warning('请选择文件')
@@ -62,6 +134,9 @@ const handleUpload = async () => {
   }
 
   loading.value = true
+  uploading.value = true
+  uploadProgress.value = 10
+
   try {
     const data = new FormData()
     data.append('file', file.raw)
@@ -71,15 +146,27 @@ const handleUpload = async () => {
     }
 
     const res = await importApi.upload(data)
-    ElMessage.success(res.message || '上传成功')
-    fileList.value = []
-    formData.value.metric_code = ''
+    uploadProgress.value = 30
+    currentBatchId.value = res.batch_id
+
+    ElMessage.info(`文件上传成功，正在处理...`)
+
+    // Start polling to track progress
+    startPolling()
   } catch (error: any) {
+    loading.value = false
+    uploading.value = false
+    uploadProgress.value = 0
     ElMessage.error(error?.response?.data?.detail || '上传失败')
   } finally {
     loading.value = false
   }
 }
+
+// Clean up on unmount
+onUnmounted(() => {
+  stopPolling()
+})
 
 onMounted(fetchMetrics)
 </script>
@@ -137,9 +224,77 @@ onMounted(fetchMetrics)
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="handleUpload" :loading="loading">
-                开始上传
+              <el-button
+                type="primary"
+                @click="handleUpload"
+                :loading="loading"
+                :disabled="uploading"
+              >
+                {{ uploading ? '处理中...' : '开始上传' }}
               </el-button>
+            </el-form-item>
+
+            <!-- Upload Progress Section -->
+            <el-form-item v-if="uploading">
+              <div class="progress-section">
+                <div class="progress-header">
+                  <span class="progress-title">处理进度</span>
+                  <span class="progress-percent">{{ uploadProgress }}%</span>
+                </div>
+                <el-progress :percentage="uploadProgress" />
+
+                <!-- Status Display -->
+                <div v-if="currentBatch" class="status-info">
+                  <el-alert
+                    v-if="currentBatch.status === 'pending'"
+                    title="等待处理"
+                    type="info"
+                    :closable="false"
+                    description="文件已上传，等待服务器处理..."
+                  />
+                  <el-alert
+                    v-else-if="currentBatch.status === 'processing'"
+                    title="处理中"
+                    type="warning"
+                    :closable="false"
+                  >
+                    <template #description>
+                      <div v-if="currentBatch.file_type === 'CSV'">
+                        正在导入股票-概念关系数据...
+                      </div>
+                      <div v-else>
+                        <div>正在导入指标数据...</div>
+                        <div v-if="currentBatch.compute_status === 'pending'" style="margin-top: 4px;">
+                          计算状态: <el-tag type="info">等待计算</el-tag>
+                        </div>
+                        <div v-else-if="currentBatch.compute_status === 'computing'" style="margin-top: 4px;">
+                          计算状态: <el-tag type="warning">计算中</el-tag>
+                        </div>
+                      </div>
+                    </template>
+                  </el-alert>
+                  <el-alert
+                    v-else-if="currentBatch.status === 'completed' || currentBatch.status === 'success'"
+                    title="导入成功"
+                    type="success"
+                    :closable="false"
+                  >
+                    <template #description>
+                      <div>成功: {{ currentBatch.success_rows }} / 失败: {{ currentBatch.error_rows }} / 总计: {{ currentBatch.total_rows }}</div>
+                      <div v-if="currentBatch.file_type === 'TXT'" style="margin-top: 4px;">
+                        排名计算: <el-tag type="success">已完成</el-tag>
+                      </div>
+                    </template>
+                  </el-alert>
+                  <el-alert
+                    v-else-if="currentBatch.status === 'failed'"
+                    title="导入失败"
+                    type="error"
+                    :closable="false"
+                    :description="currentBatch.error_message || '未知错误'"
+                  />
+                </div>
+              </div>
             </el-form-item>
           </el-form>
         </el-card>
@@ -192,5 +347,42 @@ BJ430047	12345.67</pre>
   padding: 10px;
   border-radius: 4px;
   overflow-x: auto;
+}
+
+.progress-section {
+  background: #f5f7fa;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-title {
+  font-weight: 500;
+  color: #303133;
+}
+
+.progress-percent {
+  font-size: 18px;
+  font-weight: bold;
+  color: #409eff;
+}
+
+.status-info {
+  margin-top: 12px;
+}
+
+.status-info :deep(.el-alert) {
+  margin-bottom: 8px;
+}
+
+.status-info :deep(.el-alert:last-child) {
+  margin-bottom: 0;
 }
 </style>
