@@ -230,8 +230,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { request } from '@/api/request'
 
 interface Subscription {
   id: number
@@ -309,9 +310,10 @@ const formRules = {
   end_date: [{ required: true, message: '请选择过期时间', trigger: 'change' }],
 }
 
-const formatDate = (date: string) => {
+const formatDate = (date: string | Date | undefined) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('zh-CN', {
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return dateObj.toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -332,51 +334,38 @@ const getStatusType = (status: string) => {
 
 const loadSubscriptions = async () => {
   try {
-    // TODO: 调用 API: GET /api/v1/subscriptions/admin
-    // const response = await fetch('/api/v1/subscriptions/admin')
-    // subscriptions.value = await response.json()
-    // 模拟数据
-    subscriptions.value = [
-      {
-        id: 1,
-        user_id: 1,
-        plan_id: 1,
-        start_date: '2024-01-01T00:00:00Z',
-        end_date: '2025-01-01T00:00:00Z',
-        amount_paid: 99,
-        payment_method: 'wechat',
-        transaction_id: 'TXN001',
-        status: 'active',
-        notes: '测试订阅',
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-        is_valid: true,
-        days_remaining: 100,
-        plan: { id: 1, display_name: '月度套餐' },
+    // 调用 API: GET /api/v1/subscriptions/admin
+    const data = await request.get<any, Subscription[]>('/subscriptions/admin', {
+      params: {
+        status_filter: filterForm.value.status || undefined,
       },
-    ]
+    })
+    // 前端本地过滤关键字
+    if (filterForm.value.keyword) {
+      subscriptions.value = data.filter((sub) =>
+        sub.user_id.toString().includes(filterForm.value.keyword)
+      )
+    } else {
+      subscriptions.value = data
+    }
   } catch (error) {
     ElMessage.error('加载订阅列表失败')
+    console.error(error)
   }
 }
 
 const loadPlans = async () => {
   try {
-    // TODO: 调用 API: GET /api/v1/plans
-    // const response = await fetch('/api/v1/plans')
-    // plansOptions.value = await response.json()
-    plansOptions.value = [
-      { id: 1, display_name: '月度套餐', price: 99, duration_days: 30 },
-      { id: 2, display_name: '季度套餐', price: 249, duration_days: 90 },
-      { id: 3, display_name: '年度套餐', price: 699, duration_days: 365 },
-    ]
+    // 调用 API: GET /api/v1/plans (公开端点，获取所有启用的套餐)
+    const data = await request.get<any, any[]>('/plans')
+    plansOptions.value = data
   } catch (error) {
     ElMessage.error('加载套餐列表失败')
+    console.error(error)
   }
 }
 
 const handleSearch = () => {
-  // TODO: 实现搜索逻辑
   loadSubscriptions()
 }
 
@@ -418,26 +407,33 @@ const handleSaveSubscription = async () => {
   await formRef.value.validate()
   try {
     if (editingSubscription.value) {
-      // TODO: 调用编辑 API
+      // 调用编辑 API: PUT /api/v1/subscriptions/admin/{id}
+      await request.put(`/subscriptions/admin/${editingSubscription.value.id}`, formData.value)
       ElMessage.success('订阅已更新')
     } else {
-      // TODO: 调用创建 API
+      // 调用创建 API: POST /api/v1/subscriptions/admin
+      await request.post('/subscriptions/admin', formData.value)
       ElMessage.success('订阅已创建')
     }
     dialogVisible.value = false
     await loadSubscriptions()
   } catch (error) {
     ElMessage.error('操作失败')
+    console.error(error)
   }
 }
 
 const handleViewDetails = async (subscription: Subscription) => {
   selectedSubscription.value = subscription
   try {
-    // TODO: 调用获取日志 API
-    subscriptionLogs.value = []
+    // 调用获取日志 API: GET /api/v1/subscriptions/admin/{id}/logs
+    const logs = await request.get<any, SubscriptionLog[]>(
+      `/subscriptions/admin/${subscription.id}/logs`
+    )
+    subscriptionLogs.value = logs
   } catch (error) {
     ElMessage.error('加载日志失败')
+    console.error(error)
   }
   detailsDrawerVisible.value = true
 }
@@ -451,23 +447,41 @@ const handleExtendSubscription = (subscription: Subscription) => {
 const handleConfirmExtend = async () => {
   if (!extendingSubscription.value) return
   try {
-    // TODO: 调用延期 API: POST /api/v1/subscriptions/admin/{id}/extend
+    // 调用延期 API: POST /api/v1/subscriptions/admin/{id}/extend
+    await request.post(`/subscriptions/admin/${extendingSubscription.value.id}/extend`, null, {
+      params: { days: extendForm.value.days },
+    })
     ElMessage.success(`已延期 ${extendForm.value.days} 天`)
     extendDialogVisible.value = false
     await loadSubscriptions()
   } catch (error) {
     ElMessage.error('延期失败')
+    console.error(error)
   }
 }
 
 const handleCancelSubscription = async (subscriptionId: number) => {
-  try {
-    // TODO: 调用取消 API (设置状态为 cancelled)
-    ElMessage.success('订阅已取消')
-    await loadSubscriptions()
-  } catch (error) {
-    ElMessage.error('取消失败')
-  }
+  ElMessageBox.confirm('确定要取消此订阅吗？', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(async () => {
+      try {
+        // 调用更新 API: PUT /api/v1/subscriptions/admin/{id} (设置状态为 cancelled)
+        await request.put(`/subscriptions/admin/${subscriptionId}`, {
+          status: 'cancelled',
+        })
+        ElMessage.success('订阅已取消')
+        await loadSubscriptions()
+      } catch (error) {
+        ElMessage.error('取消失败')
+        console.error(error)
+      }
+    })
+    .catch(() => {
+      ElMessage.info('取消已中止')
+    })
 }
 
 onMounted(async () => {

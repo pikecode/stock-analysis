@@ -115,6 +115,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { request } from '@/api/request'
 
 interface Plan {
   id: number
@@ -163,57 +164,14 @@ const formRules = {
   duration_days: [{ required: true, message: '请输入时长', trigger: 'blur' }],
 }
 
-// TODO: 这里需要实现实际的 API 调用
-// 目前使用模拟数据
 const loadPlans = async () => {
   try {
-    // const response = await fetch('/api/v1/admin/plans')
-    // const data = await response.json()
-    // plans.value = data
-    // 模拟数据
-    plans.value = [
-      {
-        id: 1,
-        name: 'monthly',
-        display_name: '月度套餐',
-        description: '月度订阅，享受所有报表功能',
-        price: 99,
-        original_price: 129,
-        duration_days: 30,
-        is_active: true,
-        sort_order: 1,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 2,
-        name: 'quarterly',
-        display_name: '季度套餐',
-        description: '季度订阅，性价比更优',
-        price: 249,
-        original_price: 349,
-        duration_days: 90,
-        is_active: true,
-        sort_order: 2,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 3,
-        name: 'yearly',
-        display_name: '年度套餐',
-        description: '年度订阅，折扣力度最大',
-        price: 699,
-        original_price: 1000,
-        duration_days: 365,
-        is_active: true,
-        sort_order: 3,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      },
-    ]
+    // 调用 API: GET /api/v1/plans/admin/all (获取所有套餐，包括停用的)
+    const data = await request.get<any, Plan[]>('/plans/admin/all')
+    plans.value = data
   } catch (error) {
     ElMessage.error('加载套餐列表失败')
+    console.error(error)
   }
 }
 
@@ -244,37 +202,31 @@ const handleSavePlan = async () => {
   await formRef.value.validate()
   try {
     if (editingPlan.value) {
-      // TODO: 调用编辑 API
-      // await fetch(`/api/v1/admin/plans/${editingPlan.value.id}`, {
-      //   method: 'PUT',
-      //   body: JSON.stringify(formData.value),
-      // })
+      // 调用编辑 API: PUT /api/v1/plans/admin/{id}
+      await request.put(`/plans/admin/${editingPlan.value.id}`, formData.value)
       ElMessage.success('套餐更新成功')
     } else {
-      // TODO: 调用创建 API
-      // await fetch('/api/v1/admin/plans', {
-      //   method: 'POST',
-      //   body: JSON.stringify(formData.value),
-      // })
+      // 调用创建 API: POST /api/v1/plans/admin
+      await request.post('/plans/admin', formData.value)
       ElMessage.success('套餐创建成功')
     }
     dialogVisible.value = false
     await loadPlans()
   } catch (error) {
     ElMessage.error('操作失败，请重试')
+    console.error(error)
   }
 }
 
 const handleDeletePlan = async (planId: number) => {
   try {
-    // TODO: 调用删除 API
-    // await fetch(`/api/v1/admin/plans/${planId}`, {
-    //   method: 'DELETE',
-    // })
+    // 调用删除 API: DELETE /api/v1/plans/admin/{id}
+    await request.delete(`/plans/admin/${planId}`)
     ElMessage.success('套餐删除成功')
     await loadPlans()
   } catch (error) {
     ElMessage.error('删除失败，请重试')
+    console.error(error)
   }
 }
 
