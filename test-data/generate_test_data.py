@@ -99,7 +99,7 @@ def generate_csv_file(output_path="test-data/test_import_stocks_concepts.csv"):
 
             for concept in selected_concepts:
                 writer.writerow([
-                    int(stock_code),                     # 股票代码（转为整数）
+                    stock_code,                          # 股票代码（保持字符串格式）
                     stock_name,                          # 股票名称
                     random.randint(1, 50),               # 全部页数
                     random.randint(1000, 100000),        # 热帖首页页阅读总数
