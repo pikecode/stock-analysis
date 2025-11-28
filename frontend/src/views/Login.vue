@@ -56,9 +56,9 @@ const handleLogin = async () => {
     console.log('⬅️ authStore.login() 返回:', success)
 
     if (success) {
-      // 检查是否是管理员
-      console.log('🔍 检查用户角色，isAdmin:', authStore.isAdmin)
-      if (authStore.isAdmin) {
+      // 检查是否是管理员（通过 clientUser 的角色字段）
+      console.log('🔍 检查用户角色，clientUser.role:', authStore.clientUser?.role)
+      if (authStore.clientUser?.role === 'ADMIN') {
         console.error('❌ 管理员用户不能访问客户端')
         ElMessage.error('管理员用户请使用管理员登录页面')
         await authStore.logout('client')

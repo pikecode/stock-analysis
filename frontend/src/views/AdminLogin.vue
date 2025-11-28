@@ -48,12 +48,9 @@ const handleLogin = async () => {
       return
     }
 
-    // 检查是否是管理员
-    console.log('🔍 检查用户角色')
-    console.log('🔍 authStore.adminUser:', authStore.adminUser)
-    console.log('🔍 adminUser.role:', authStore.adminUser?.role)
-    console.log('🔍 isAdmin:', authStore.isAdmin)
-    if (!authStore.isAdmin) {
+    // 检查是否是管理员（通过 adminUser 的角色字段）
+    console.log('🔍 检查用户角色，adminUser.role:', authStore.adminUser?.role)
+    if (authStore.adminUser?.role !== 'ADMIN') {
       console.error('❌ 用户不是管理员，角色为:', authStore.adminUser?.role || '未知')
       ElMessage.error(`此页面仅限管理员访问。您的角色为: ${authStore.adminUser?.role || '未知'}`)
       await authStore.logout('admin')
