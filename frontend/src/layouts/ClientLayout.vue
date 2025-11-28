@@ -39,9 +39,13 @@ onUnmounted(() => {
 
 const activeMenu = computed(() => {
   const path = route.path
-  if (path.startsWith('/reports')) return path
-  if (path.startsWith('/analysis')) return path
-  if (path.startsWith('/profile')) return path
+  // 精确匹配菜单项
+  if (path === '/reports') return '/reports'
+  if (path === '/reports/concept-ranking') return '/reports/concept-ranking'
+  if (path === '/reports/new-highs') return '/reports/new-highs'
+  if (path === '/profile' || path.startsWith('/profile/')) return '/profile'
+  // 其他 /reports 下的路径默认高亮报表总览
+  if (path.startsWith('/reports')) return '/reports'
   return path
 })
 
@@ -109,37 +113,29 @@ const sidebarWidth = computed(() => {
         text-color="#303133"
         active-text-color="#409EFF"
       >
-        <!-- 报表分析 -->
-        <el-sub-menu index="/reports">
-          <template #title>
-            <el-icon><DataAnalysis /></el-icon>
-            <span>报表分析</span>
-          </template>
-          <el-menu-item index="/reports">报表总览</el-menu-item>
-          <el-menu-item index="/reports/concept-ranking">概念排名</el-menu-item>
-          <el-menu-item index="/reports/stock-trend">股票趋势</el-menu-item>
-          <el-menu-item index="/reports/top-n">Top N 分析</el-menu-item>
-        </el-sub-menu>
+        <!-- 报表总览 -->
+        <el-menu-item index="/reports">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>报表总览</span>
+        </el-menu-item>
 
-        <!-- 数据分析 -->
-        <el-sub-menu index="/analysis">
-          <template #title>
-            <el-icon><TrendCharts /></el-icon>
-            <span>数据分析</span>
-          </template>
-          <el-menu-item index="/analysis/portfolio">投资组合</el-menu-item>
-          <el-menu-item index="/analysis/performance">业绩分析</el-menu-item>
-        </el-sub-menu>
+        <!-- 概念排名 -->
+        <el-menu-item index="/reports/concept-ranking">
+          <el-icon><TrendCharts /></el-icon>
+          <span>概念排名</span>
+        </el-menu-item>
 
-        <!-- 个人中心 -->
-        <el-sub-menu index="/profile">
-          <template #title>
-            <el-icon><User /></el-icon>
-            <span>个人中心</span>
-          </template>
-          <el-menu-item index="/profile">用户信息</el-menu-item>
-          <el-menu-item index="/profile/settings">账户设置</el-menu-item>
-        </el-sub-menu>
+        <!-- 创新高分析 -->
+        <el-menu-item index="/reports/new-highs">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>创新高分析</span>
+        </el-menu-item>
+
+        <!-- 用户信息 -->
+        <el-menu-item index="/profile">
+          <el-icon><User /></el-icon>
+          <span>用户信息</span>
+        </el-menu-item>
       </el-menu>
     </el-drawer>
 
@@ -170,37 +166,29 @@ const sidebarWidth = computed(() => {
         active-text-color="#409EFF"
         :collapse="isCollapsed"
       >
-        <!-- 报表分析 -->
-        <el-sub-menu index="/reports">
-          <template #title>
-            <el-icon><DataAnalysis /></el-icon>
-            <span>报表分析</span>
-          </template>
-          <el-menu-item index="/reports">报表总览</el-menu-item>
-          <el-menu-item index="/reports/concept-ranking">概念排名</el-menu-item>
-          <el-menu-item index="/reports/stock-trend">股票趋势</el-menu-item>
-          <el-menu-item index="/reports/top-n">Top N 分析</el-menu-item>
-        </el-sub-menu>
+        <!-- 报表总览 -->
+        <el-menu-item index="/reports">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>报表总览</span>
+        </el-menu-item>
 
-        <!-- 数据分析 -->
-        <el-sub-menu index="/analysis">
-          <template #title>
-            <el-icon><TrendCharts /></el-icon>
-            <span>数据分析</span>
-          </template>
-          <el-menu-item index="/analysis/portfolio">投资组合</el-menu-item>
-          <el-menu-item index="/analysis/performance">业绩分析</el-menu-item>
-        </el-sub-menu>
+        <!-- 概念排名 -->
+        <el-menu-item index="/reports/concept-ranking">
+          <el-icon><TrendCharts /></el-icon>
+          <span>概念排名</span>
+        </el-menu-item>
 
-        <!-- 个人中心 -->
-        <el-sub-menu index="/profile">
-          <template #title>
-            <el-icon><User /></el-icon>
-            <span>个人中心</span>
-          </template>
-          <el-menu-item index="/profile">用户信息</el-menu-item>
-          <el-menu-item index="/profile/settings">账户设置</el-menu-item>
-        </el-sub-menu>
+        <!-- 创新高分析 -->
+        <el-menu-item index="/reports/new-highs">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>创新高分析</span>
+        </el-menu-item>
+
+        <!-- 用户信息 -->
+        <el-menu-item index="/profile">
+          <el-icon><User /></el-icon>
+          <span>用户信息</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -359,6 +347,18 @@ const sidebarWidth = computed(() => {
     gap: 6px;
     cursor: pointer;
     color: #606266;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .user-info:hover {
+    background-color: #f5f7fa;
+    color: #409EFF;
+  }
+
+  .user-info .el-icon {
+    transition: all 0.2s ease;
   }
 
   .main-content {
@@ -391,37 +391,69 @@ const sidebarWidth = computed(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 8px 12px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
     height: 56px;
     z-index: 100;
+    border-bottom: 1px solid #f0f0f0;
   }
 
   .menu-btn {
-    font-size: 20px;
-    padding: 4px;
+    font-size: 22px;
+    padding: 8px;
     min-width: auto;
+    width: 44px !important;
+    height: 44px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+
+  .menu-btn:hover {
+    background-color: rgba(64, 158, 255, 0.1) !important;
+  }
+
+  .menu-btn:active {
+    background-color: rgba(64, 158, 255, 0.2) !important;
   }
 
   .logo-text {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #303133;
     margin: 0;
     flex: 1;
     text-align: center;
+    white-space: nowrap;
   }
 
   .user-btn {
-    font-size: 20px;
-    padding: 4px;
+    font-size: 22px;
+    padding: 8px;
     min-width: auto;
+    width: 44px !important;
+    height: 44px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+
+  .user-btn:hover {
+    background-color: rgba(64, 158, 255, 0.1) !important;
+  }
+
+  .user-btn:active {
+    background-color: rgba(64, 158, 255, 0.2) !important;
   }
 
   .user-dropdown {
-    margin-left: 8px;
+    margin-left: 4px;
   }
 
   .main-content {
@@ -433,15 +465,68 @@ const sidebarWidth = computed(() => {
 
   /* 移动端菜单样式 */
   :deep(.el-drawer) {
-    width: 250px !important;
+    width: 280px !important;
+  }
+
+  :deep(.el-drawer__header) {
+    padding: 16px;
+    border-bottom: 1px solid #ebeef5;
+    margin-bottom: 0;
+  }
+
+  :deep(.el-drawer__title) {
+    font-size: 15px;
+    font-weight: 600;
+    color: #303133;
   }
 
   :deep(.el-drawer__body) {
-    padding: 0;
+    padding: 0 !important;
+    overflow-y: auto;
+  }
+
+  :deep(.el-drawer__close) {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
   }
 
   :deep(.el-menu) {
     border: none;
+  }
+
+  /* 移动端菜单项优化 */
+  :deep(.el-menu--vertical.el-menu) {
+    border-right: none;
+  }
+
+  :deep(.el-menu-item) {
+    height: 52px !important;
+    line-height: 52px !important;
+    padding: 0 16px !important;
+    font-size: 15px;
+    transition: all 0.2s ease;
+  }
+
+  :deep(.el-menu-item .el-icon) {
+    margin-right: 12px !important;
+    font-size: 18px;
+    transition: all 0.2s ease;
+  }
+
+  :deep(.el-menu-item:hover) {
+    background-color: rgba(64, 158, 255, 0.1) !important;
+  }
+
+  :deep(.el-menu-item.is-active) {
+    background-color: rgba(64, 158, 255, 0.15) !important;
+    border-right: 3px solid #409EFF;
+    color: #409EFF !important;
+    padding-right: 13px !important;
+  }
+
+  :deep(.el-menu-item.is-active .el-icon) {
+    color: #409EFF;
   }
 }
 
@@ -455,39 +540,104 @@ const sidebarWidth = computed(() => {
   flex-direction: column;
 }
 
-/* Element Plus 菜单折叠样式 */
+/* Element Plus 菜单样式优化 */
 :deep(.el-menu) {
   transition: width 0.3s ease;
 }
 
+:deep(.el-menu-item) {
+  height: 48px !important;
+  line-height: 48px !important;
+  transition: all 0.2s ease;
+}
+
+:deep(.el-menu-item .el-icon) {
+  margin-right: 10px !important;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+:deep(.el-menu-item:hover) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #409EFF !important;
+}
+
+:deep(.el-menu-item:hover .el-icon) {
+  color: #409EFF;
+}
+
+:deep(.el-menu-item.is-active) {
+  background-color: rgba(64, 158, 255, 0.2) !important;
+  border-left: 3px solid #409EFF;
+  padding-left: 9px !important;
+}
+
+:deep(.el-menu-item.is-active .el-icon) {
+  color: #409EFF;
+}
+
+/* PC端菜单折叠样式 */
 :deep(.el-menu--collapse) {
   width: 64px;
 }
 
-:deep(.el-menu--collapse .el-menu-item),
-:deep(.el-menu--collapse .el-sub-menu__title) {
+:deep(.el-menu--collapse .el-menu-item) {
   padding: 0 !important;
   text-align: center;
 }
 
-:deep(.el-menu--collapse .el-menu-item span),
-:deep(.el-menu--collapse .el-sub-menu__title span) {
+:deep(.el-menu--collapse .el-menu-item span) {
   display: none;
 }
 
-:deep(.el-menu--collapse .el-menu-item [class*='el-icon']),
-:deep(.el-menu--collapse .el-sub-menu__title [class*='el-icon']) {
+:deep(.el-menu--collapse .el-menu-item [class*='el-icon']) {
   margin: 0 !important;
+}
+
+:deep(.el-menu--collapse .el-menu-item.is-active) {
+  border-left: none;
+  border-bottom: 3px solid #409EFF;
+  padding-left: 0 !important;
+}
+
+/* 全局下拉菜单样式优化 */
+:deep(.el-dropdown-menu) {
+  min-width: 160px;
+  border-radius: 4px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #ebeef5;
+  overflow: hidden;
+}
+
+:deep(.el-dropdown-menu__item) {
+  height: 44px;
+  line-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+:deep(.el-dropdown-menu__item:hover) {
+  background-color: #f5f7fa;
+  color: #409EFF;
+}
+
+:deep(.el-dropdown-menu__item .el-icon) {
+  margin-right: 8px;
+  transition: all 0.2s ease;
 }
 
 /* 菜单项工具提示 */
 :deep(.el-popper.is-dark) {
-  background-color: rgba(16, 16, 16, 0.9);
+  background-color: rgba(16, 16, 16, 0.95);
   border-color: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 8px 12px;
 }
 
 :deep(.el-popper.is-dark[role='tooltip'] .popper__arrow::after) {
-  border-top-color: rgba(16, 16, 16, 0.9);
+  border-top-color: rgba(16, 16, 16, 0.95);
 }
 
 /* 收起状态下侧边栏的额外优化 */

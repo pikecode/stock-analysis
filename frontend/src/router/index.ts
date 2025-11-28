@@ -76,6 +76,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/reports/StockTopNAnalysis.vue'),
         meta: { title: 'Top N 分析' },
       },
+      {
+        path: 'new-highs',
+        name: 'NewHighsAnalysis',
+        component: () => import('@/views/reports/NewHighsAnalysis.vue'),
+        meta: { title: '创新高分析' },
+      },
     ],
   },
 
