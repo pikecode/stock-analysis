@@ -105,6 +105,7 @@ export interface ImportBatch {
   started_at?: string
   completed_at?: string
   created_at: string
+  error_message?: string
 }
 
 export interface MetricType {

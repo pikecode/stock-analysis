@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { importApi } from '@/api'
 import type { MetricType, ImportBatch } from '@/types'
@@ -12,7 +12,13 @@ const metrics = ref<MetricType[]>([])
 const uploadProgress = ref(0)
 const currentBatchId = ref<number | null>(null)
 const currentBatch = ref<ImportBatch | null>(null)
+const activeStep = ref(0)
 let pollInterval: ReturnType<typeof setInterval> | null = null
+
+const fileTypeOptions = [
+  { label: 'CSV (股票-概念关系)', value: 'CSV' },
+  { label: 'TXT (指标数据)', value: 'TXT' },
+]
 
 const formData = ref({
   file_type: 'TXT',
@@ -20,6 +26,48 @@ const formData = ref({
 })
 
 const fileList = ref<UploadFile[]>([])
+
+// Grouped metrics for better display
+const groupedMetrics = computed(() => {
+  return metrics.value.reduce((acc, metric) => {
+    const group = '所有指标'
+    if (!acc[group]) {
+      acc[group] = []
+    }
+    acc[group].push(metric)
+    return acc
+  }, {} as Record<string, MetricType[]>)
+})
+
+// Check if upload is allowed
+const canUpload = computed(() => {
+  const hasFile = fileList.value.length > 0
+  const hasMetric = formData.value.file_type === 'CSV' || formData.value.metric_code !== ''
+  return hasFile && hasMetric
+})
+
+// Progress color based on percentage
+const getProgressColor = computed(() => {
+  if (uploadProgress.value < 30) return '#F56C6C'
+  if (uploadProgress.value < 70) return '#E6A23C'
+  return '#67C23A'
+})
+
+// Get step status
+const getStepStatus = (stepIndex: number) => {
+  if (activeStep.value > stepIndex) return 'finish'
+  if (activeStep.value === stepIndex) return 'process'
+  return 'wait'
+}
+
+// Format file size
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+}
 
 const fetchMetrics = async () => {
   try {
@@ -174,185 +222,582 @@ onMounted(fetchMetrics)
 <template>
   <div class="import-view">
     <div class="page-header">
-      <h1 class="page-title">数据导入</h1>
+      <h1 class="page-title">📊 数据导入</h1>
+      <p class="page-subtitle">上传CSV或TXT文件进行股票数据导入和指标分析</p>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="12">
-        <el-card header="上传文件">
-          <el-form label-width="100px">
-            <el-form-item label="文件类型">
-              <el-radio-group v-model="formData.file_type">
-                <el-radio value="CSV">CSV (股票-概念关系)</el-radio>
-                <el-radio value="TXT">TXT (指标数据)</el-radio>
-              </el-radio-group>
-            </el-form-item>
+    <div class="import-container">
+      <!-- Steps -->
+      <el-steps :active="activeStep" align-center class="steps-container">
+        <el-step title="选择文件类型" :status="getStepStatus(0)" />
+        <el-step title="配置导入参数" :status="getStepStatus(1)" />
+        <el-step title="选择文件" :status="getStepStatus(2)" />
+        <el-step title="上传并处理" :status="getStepStatus(3)" />
+      </el-steps>
 
-            <el-form-item label="指标类型" v-if="formData.file_type === 'TXT'">
-              <el-select v-model="formData.metric_code" placeholder="选择指标" style="width: 100%">
-                <el-option
-                  v-for="m in metrics"
-                  :key="m.code"
-                  :label="`${m.name} (${m.code})`"
-                  :value="m.code"
-                />
-              </el-select>
-              <div style="font-size: 12px; color: #999; margin-top: 4px;">
-                数据日期将从文件名自动解析（如: TTV_20240101.txt）
+      <el-row :gutter="20" style="margin-top: 30px;">
+        <!-- Left: Upload Form -->
+        <el-col :xl="12" :lg="12" :md="24">
+          <el-card class="upload-card">
+            <template #header>
+              <div class="card-header">
+                <span>📁 导入向导</span>
+                <span v-if="!uploading" class="card-step">步骤 {{ activeStep + 1 }}/4</span>
               </div>
-            </el-form-item>
+            </template>
 
-            <el-form-item label="选择文件">
-              <el-upload
-                drag
-                :auto-upload="false"
-                :file-list="fileList"
-                :on-change="handleFileChange"
-                :limit="1"
-                accept=".csv,.txt"
-              >
-                <el-icon class="el-icon--upload"><Upload /></el-icon>
-                <div class="el-upload__text">
-                  拖拽文件到此处，或 <em>点击上传</em>
-                </div>
-                <template #tip>
-                  <div class="el-upload__tip">
-                    支持 CSV 和 TXT 格式文件
+            <el-form label-width="100px" class="import-form">
+              <!-- Step 1: File Type Selection -->
+              <div class="form-section" v-if="!uploading">
+                <div class="section-title">第1步: 选择文件类型</div>
+                <el-form-item label="文件类型">
+                  <el-segmented v-model="formData.file_type" :options="fileTypeOptions" size="large" />
+                  <div class="file-type-hint">
+                    <span v-if="formData.file_type === 'CSV'">
+                      💾 CSV 文件: 导入股票与概念的关联关系（股票代码、股票名称、概念）
+                    </span>
+                    <span v-else>
+                      📈 TXT 文件: 导入每日指标数据（交易量、活跃度等指标）
+                    </span>
                   </div>
-                </template>
-              </el-upload>
-            </el-form-item>
+                </el-form-item>
+              </div>
 
-            <el-form-item>
-              <el-button
-                type="primary"
-                @click="handleUpload"
-                :loading="loading"
-                :disabled="uploading"
-              >
-                {{ uploading ? '处理中...' : '开始上传' }}
-              </el-button>
-            </el-form-item>
-
-            <!-- Upload Progress Section -->
-            <el-form-item v-if="uploading">
-              <div class="progress-section">
-                <div class="progress-header">
-                  <span class="progress-title">处理进度</span>
-                  <span class="progress-percent">{{ uploadProgress }}%</span>
-                </div>
-                <el-progress :percentage="uploadProgress" />
-
-                <!-- Status Display -->
-                <div v-if="currentBatch" class="status-info">
-                  <el-alert
-                    v-if="currentBatch.status === 'pending'"
-                    title="等待处理"
-                    type="info"
-                    :closable="false"
-                    description="文件已上传，等待服务器处理..."
-                  />
-                  <el-alert
-                    v-else-if="currentBatch.status === 'processing'"
-                    title="处理中"
-                    type="warning"
-                    :closable="false"
+              <!-- Step 2: Metric Selection (TXT only) -->
+              <div class="form-section" v-if="!uploading && formData.file_type === 'TXT'">
+                <div class="section-title">第2步: 选择指标类型</div>
+                <el-form-item label="指标类型" required>
+                  <el-select
+                    v-model="formData.metric_code"
+                    placeholder="选择要导入的指标"
+                    style="width: 100%"
+                    filterable
                   >
-                    <template #description>
-                      <div v-if="currentBatch.file_type === 'CSV'">
-                        正在导入股票-概念关系数据...
-                      </div>
-                      <div v-else>
-                        <div>正在导入指标数据...</div>
-                        <div v-if="currentBatch.compute_status === 'pending'" style="margin-top: 4px;">
-                          计算状态: <el-tag type="info">等待计算</el-tag>
+                    <el-option-group
+                      v-for="(metrics, category) in groupedMetrics"
+                      :key="category"
+                      :label="category"
+                    >
+                      <el-option
+                        v-for="m in metrics"
+                        :key="m.code"
+                        :label="`${m.name} (${m.code})`"
+                        :value="m.code"
+                      >
+                        <div class="metric-option">
+                          <span class="metric-name">{{ m.name }}</span>
+                          <span class="metric-code">{{ m.code }}</span>
                         </div>
-                        <div v-else-if="currentBatch.compute_status === 'computing'" style="margin-top: 4px;">
-                          计算状态: <el-tag type="warning">计算中</el-tag>
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                  <div class="field-hint">
+                    💡 文件名应包含日期（如: TTV_20240101.txt），日期将自动解析
+                  </div>
+                </el-form-item>
+              </div>
+
+              <!-- Step 3: File Upload -->
+              <div class="form-section" v-if="!uploading">
+                <div class="section-title">第3步: 选择文件</div>
+                <el-form-item label="文件选择" required>
+                  <div class="upload-wrapper">
+                    <el-upload
+                      drag
+                      :auto-upload="false"
+                      :file-list="fileList"
+                      :on-change="handleFileChange"
+                      :limit="1"
+                      :accept="formData.file_type === 'CSV' ? '.csv' : '.txt'"
+                      class="drag-upload"
+                    >
+                      <el-icon class="upload-icon"><Upload /></el-icon>
+                      <div class="upload-text">
+                        <div class="upload-title">拖拽或点击上传</div>
+                        <div class="upload-desc">
+                          支持 {{ formData.file_type }} 格式，文件大小不超过 100MB
                         </div>
                       </div>
-                    </template>
-                  </el-alert>
-                  <el-alert
-                    v-else-if="currentBatch.status === 'completed' || currentBatch.status === 'success'"
-                    title="导入成功"
-                    type="success"
-                    :closable="false"
+                    </el-upload>
+                  </div>
+                </el-form-item>
+
+                <!-- File Info -->
+                <el-form-item v-if="fileList.length > 0" label="文件信息">
+                  <div class="file-info-box">
+                    <div class="file-info-item">
+                      <span class="info-label">文件名:</span>
+                      <span class="info-value">{{ fileList[0].name }}</span>
+                    </div>
+                    <div class="file-info-item">
+                      <span class="info-label">文件大小:</span>
+                      <span class="info-value">{{ formatFileSize(fileList[0].size || 0) }}</span>
+                    </div>
+                  </div>
+                </el-form-item>
+              </div>
+
+              <!-- Step 4: Upload Action -->
+              <div class="form-section" v-if="!uploading">
+                <el-form-item>
+                  <el-button
+                    type="primary"
+                    size="large"
+                    @click="handleUpload"
+                    :loading="loading"
+                    :disabled="!canUpload"
+                    class="upload-btn"
                   >
-                    <template #description>
-                      <div>成功: {{ currentBatch.success_rows }} / 失败: {{ currentBatch.error_rows }} / 总计: {{ currentBatch.total_rows }}</div>
-                      <div v-if="currentBatch.file_type === 'TXT'" style="margin-top: 4px;">
-                        排名计算: <el-tag type="success">已完成</el-tag>
-                      </div>
-                    </template>
-                  </el-alert>
-                  <el-alert
-                    v-else-if="currentBatch.status === 'failed'"
-                    title="导入失败"
-                    type="error"
-                    :closable="false"
-                    :description="currentBatch.error_message || '未知错误'"
-                  />
+                    <el-icon><Upload /></el-icon>
+                    开始导入
+                  </el-button>
+                  <span class="button-hint">点击开始上传文件并进行处理</span>
+                </el-form-item>
+              </div>
+
+              <!-- Progress Section -->
+              <div v-if="uploading" class="uploading-section">
+                <div class="progress-container">
+                  <!-- Animated Steps -->
+                  <div class="process-steps">
+                    <div class="process-step" :class="{ active: uploadProgress >= 10 }">
+                      <div class="step-circle">1</div>
+                      <div class="step-label">上传文件</div>
+                    </div>
+                    <div class="process-arrow" :class="{ active: uploadProgress >= 30 }"></div>
+                    <div class="process-step" :class="{ active: uploadProgress >= 30 }">
+                      <div class="step-circle">2</div>
+                      <div class="step-label">数据解析</div>
+                    </div>
+                    <div class="process-arrow" :class="{ active: uploadProgress >= 50 }"></div>
+                    <div class="process-step" :class="{ active: uploadProgress >= 50 }">
+                      <div class="step-circle">3</div>
+                      <div class="step-label">{{ formData.file_type === 'CSV' ? '导入完成' : '计算排名' }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Progress Bar -->
+                  <div class="progress-bar-container" style="margin-top: 30px;">
+                    <div class="progress-header">
+                      <span class="progress-label">总进度</span>
+                      <span class="progress-percent">{{ uploadProgress }}%</span>
+                    </div>
+                    <el-progress :percentage="uploadProgress" :color="getProgressColor" />
+                  </div>
+
+                  <!-- Status Info -->
+                  <div v-if="currentBatch" class="status-container">
+                    <el-alert
+                      v-if="currentBatch.status === 'pending'"
+                      title="⏳ 等待处理"
+                      type="info"
+                      :closable="false"
+                    >
+                      <template #description>
+                        文件已上传，系统正在准备处理...
+                      </template>
+                    </el-alert>
+
+                    <el-alert
+                      v-else-if="currentBatch.status === 'processing'"
+                      title="⚙️ 处理中"
+                      type="warning"
+                      :closable="false"
+                    >
+                      <template #description>
+                        <div class="processing-details">
+                          <div v-if="currentBatch.file_type === 'CSV'">
+                            ✓ 正在导入股票-概念关系数据...
+                          </div>
+                          <div v-else>
+                            ✓ 正在导入指标数据...
+                            <div v-if="currentBatch.compute_status === 'pending'" style="margin-top: 8px;">
+                              计算状态: <el-tag type="info">等待计算</el-tag>
+                            </div>
+                            <div v-else-if="currentBatch.compute_status === 'computing'" style="margin-top: 8px;">
+                              计算状态: <el-tag type="warning">计算排名中</el-tag>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </el-alert>
+
+                    <el-alert
+                      v-else-if="currentBatch.status === 'completed' || currentBatch.status === 'success'"
+                      title="✅ 导入成功"
+                      type="success"
+                      :closable="false"
+                    >
+                      <template #description>
+                        <div class="success-details">
+                          <div class="stat-row">
+                            <span class="stat-label">成功:</span>
+                            <span class="stat-value success">{{ currentBatch.success_rows }}</span>
+                            <span class="stat-label">失败:</span>
+                            <span class="stat-value error">{{ currentBatch.error_rows }}</span>
+                            <span class="stat-label">总计:</span>
+                            <span class="stat-value">{{ currentBatch.total_rows }}</span>
+                          </div>
+                          <div v-if="currentBatch.file_type === 'TXT'" style="margin-top: 8px;">
+                            排名计算: <el-tag type="success">已完成</el-tag>
+                          </div>
+                        </div>
+                      </template>
+                    </el-alert>
+
+                    <el-alert
+                      v-else-if="currentBatch.status === 'failed'"
+                      title="❌ 导入失败"
+                      type="error"
+                      :closable="false"
+                    >
+                      <template #description>
+                        {{ currentBatch.error_message || '未知错误' }}
+                      </template>
+                    </el-alert>
+                  </div>
                 </div>
               </div>
-            </el-form-item>
-          </el-form>
-        </el-card>
-      </el-col>
+            </el-form>
+          </el-card>
+        </el-col>
 
-      <el-col :span="12">
-        <el-card header="文件格式说明">
-          <el-collapse>
-            <el-collapse-item title="CSV 格式 (股票-概念关系)" name="csv">
-              <div class="format-desc">
-                <p>用于导入股票与概念的关联关系</p>
-                <pre>股票代码,股票名称,概念
+        <!-- Right: File Format Guide -->
+        <el-col :xl="12" :lg="12" :md="24">
+          <el-card class="guide-card">
+            <template #header>
+              <div class="card-header">
+                <span>📚 文件格式指南</span>
+              </div>
+            </template>
+
+            <!-- CSV Guide -->
+            <div class="guide-section">
+              <div class="guide-title">📄 CSV 文件格式</div>
+              <div class="guide-content">
+                <p class="guide-desc">用于导入股票与概念的关联关系</p>
+                <div class="code-block">
+                  <pre>股票代码,股票名称,概念
 000001,平安银行,银行;金融科技
-600000,浦发银行,银行</pre>
+600000,浦发银行,银行
+601399,工商银行,银行;国企改革</pre>
+                </div>
+                <ul class="guide-tips">
+                  <li>✓ 第1列: 股票代码（如000001、600000）</li>
+                  <li>✓ 第2列: 股票名称（如平安银行）</li>
+                  <li>✓ 第3列: 概念名称（多个用分号;分隔）</li>
+                </ul>
               </div>
-            </el-collapse-item>
-            <el-collapse-item title="TXT 格式 (指标数据)" name="txt">
-              <div class="format-desc">
-                <p>用于导入每日指标数据，文件名需包含日期</p>
-                <p>例如: TTV_20240101.txt</p>
-                <pre>SH600000	1234567.89
+            </div>
+
+            <el-divider />
+
+            <!-- TXT Guide -->
+            <div class="guide-section">
+              <div class="guide-title">📈 TXT 文件格式</div>
+              <div class="guide-content">
+                <p class="guide-desc">用于导入每日指标数据，需包含日期</p>
+                <div class="code-block">
+                  <pre>SH600000	1234567.89
 SZ000001	987654.32
 BJ430047	12345.67</pre>
-                <p>格式: 股票代码(带前缀)[Tab]指标值</p>
+                </div>
+                <ul class="guide-tips">
+                  <li>✓ 格式: 股票代码(带前缀)[Tab]指标值</li>
+                  <li>✓ 文件名需包含日期，如 TTV_20240101.txt</li>
+                  <li>✓ 支持的指标:</li>
+                </ul>
               </div>
-            </el-collapse-item>
-          </el-collapse>
-        </el-card>
+            </div>
 
-        <el-card header="指标类型" style="margin-top: 20px">
-          <el-table :data="metrics" stripe>
-            <el-table-column prop="code" label="代码" width="100" />
-            <el-table-column prop="name" label="名称" />
-            <el-table-column prop="file_pattern" label="文件匹配" />
-          </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+            <!-- Metrics Table -->
+            <el-table :data="metrics" stripe size="small" class="metrics-table">
+              <el-table-column prop="code" label="代码" width="80" />
+              <el-table-column prop="name" label="指标名称" />
+              <el-table-column prop="file_pattern" label="文件匹配" width="100" />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.format-desc {
+/* Page header */
+.import-view {
+  padding: 20px;
+}
+
+.page-header {
+  margin-bottom: 30px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: bold;
+  color: #303133;
+  margin: 0 0 8px 0;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: #909399;
+  margin: 0;
+}
+
+/* Main container */
+.import-container {
+  max-width: 1400px;
+}
+
+/* Steps indicator */
+.steps-container {
+  margin-bottom: 30px;
+}
+
+:deep(.el-steps) {
+  background: transparent;
+}
+
+/* Upload card */
+.upload-card {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-weight: 500;
+}
+
+.card-step {
+  font-size: 12px;
+  color: #909399;
+  font-weight: normal;
+}
+
+/* Form sections */
+.import-form {
+  padding: 0;
+}
+
+.form-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+
+.form-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409eff;
+  display: inline-block;
+}
+
+/* File type hints */
+.file-type-hint {
+  margin-top: 8px;
   font-size: 13px;
   color: #606266;
+  padding: 8px 12px;
+  background: #fff;
+  border-left: 3px solid #409eff;
+  border-radius: 2px;
 }
 
-.format-desc pre {
+/* Form field hints */
+.field-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+  padding: 6px 8px;
   background: #f5f7fa;
-  padding: 10px;
-  border-radius: 4px;
-  overflow-x: auto;
+  border-radius: 3px;
 }
 
-.progress-section {
+/* Upload wrapper */
+.upload-wrapper {
+  margin: 0;
+}
+
+:deep(.drag-upload) {
+  width: 100%;
+}
+
+:deep(.el-upload-dragger) {
+  width: 100%;
+  padding: 40px 20px;
   background: #f5f7fa;
-  padding: 15px;
+  border: 2px dashed #c0c4cc;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #409eff;
+  margin-bottom: 12px;
+}
+
+.upload-text {
+  text-align: center;
+}
+
+.upload-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.upload-desc {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+/* File info box */
+.file-info-box {
+  background: #f5f7fa;
+  padding: 12px;
   border-radius: 4px;
+  border-left: 3px solid #67c23a;
+}
+
+.file-info-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.info-label {
+  color: #909399;
+  margin-right: 8px;
+  min-width: 60px;
+}
+
+.info-value {
+  color: #303133;
+  word-break: break-all;
+}
+
+/* Upload button */
+.upload-btn {
+  width: 100%;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.button-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+  display: block;
+}
+
+/* Uploading section */
+.uploading-section {
+  padding: 20px;
+}
+
+.progress-container {
+  background: #f5f7fa;
+  padding: 30px;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+/* Animated process steps */
+.process-steps {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 20px 0;
+}
+
+.process-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.process-step.active {
+  opacity: 1;
+}
+
+.step-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #e4e7ed;
+  color: #909399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.process-step.active .step-circle {
+  background: #409eff;
+  color: white;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.3);
+}
+
+.step-label {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #606266;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.process-step.active .step-label {
+  color: #303133;
+  font-weight: 500;
+}
+
+/* Process arrows */
+.process-arrow {
+  flex: 1;
+  height: 2px;
+  background: #e4e7ed;
+  margin: 0 10px;
+  max-width: 60px;
+  transition: all 0.3s ease;
+}
+
+.process-arrow.active {
+  background: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+/* Progress bar */
+.progress-bar-container {
+  background: white;
+  padding: 16px;
+  border-radius: 6px;
   border: 1px solid #ebeef5;
 }
 
@@ -363,7 +808,8 @@ BJ430047	12345.67</pre>
   margin-bottom: 12px;
 }
 
-.progress-title {
+.progress-label {
+  font-size: 13px;
   font-weight: 500;
   color: #303133;
 }
@@ -374,15 +820,241 @@ BJ430047	12345.67</pre>
   color: #409eff;
 }
 
-.status-info {
-  margin-top: 12px;
+:deep(.el-progress) {
+  margin-top: 8px;
 }
 
-.status-info :deep(.el-alert) {
-  margin-bottom: 8px;
+/* Status container */
+.status-container {
+  margin-top: 20px;
 }
 
-.status-info :deep(.el-alert:last-child) {
+:deep(.el-alert) {
+  margin-bottom: 12px;
+}
+
+:deep(.el-alert:last-child) {
   margin-bottom: 0;
+}
+
+.processing-details {
+  line-height: 1.6;
+}
+
+.success-details {
+  line-height: 1.6;
+}
+
+.stat-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-label {
+  color: #606266;
+  font-size: 13px;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #303133;
+}
+
+.stat-value.success {
+  color: #67c23a;
+}
+
+.stat-value.error {
+  color: #f56c6c;
+}
+
+/* Guide card */
+.guide-card {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  height: 100%;
+}
+
+.guide-section {
+  margin-bottom: 24px;
+}
+
+.guide-section:last-child {
+  margin-bottom: 0;
+}
+
+.guide-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.guide-content {
+  font-size: 13px;
+  color: #606266;
+}
+
+.guide-desc {
+  margin: 0 0 12px 0;
+  color: #909399;
+}
+
+.code-block {
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #606266;
+}
+
+.guide-tips {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0 0;
+}
+
+.guide-tips li {
+  margin: 6px 0;
+  font-size: 12px;
+  color: #606266;
+  padding-left: 0;
+}
+
+/* Metrics table */
+.metrics-table {
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+:deep(.metrics-table .el-table__header-wrapper thead th) {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+:deep(.metrics-table .el-table__body) {
+  font-size: 12px;
+}
+
+/* Metric option in dropdown */
+.metric-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metric-name {
+  flex: 1;
+}
+
+.metric-code {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .import-view {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .process-steps {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .process-arrow {
+    display: none;
+  }
+
+  .process-step {
+    flex: 0 1 calc(50% - 10px);
+  }
+
+  :deep(.el-row) {
+    row-gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .import-view {
+    padding: 12px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .form-section {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .steps-container {
+    margin-bottom: 20px;
+  }
+
+  :deep(.el-steps) {
+    font-size: 12px;
+  }
+
+  .progress-container {
+    padding: 16px;
+  }
+
+  .upload-icon {
+    font-size: 36px;
+  }
+
+  :deep(.el-upload-dragger) {
+    padding: 30px 15px;
+  }
+
+  .process-steps {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step-circle {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .code-block pre {
+    font-size: 11px;
+  }
+
+  .guide-card {
+    height: auto;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .card-step {
+    align-self: flex-end;
+  }
 }
 </style>
