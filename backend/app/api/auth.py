@@ -98,9 +98,10 @@ async def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
-    """User logout."""
-    # In a more complete implementation, you would blacklist the token
+async def logout():
+    """User logout. Token validation is handled on frontend side."""
+    # JWT is stateless - token is cleared on frontend (localStorage)
+    # Backend doesn't need to validate token for logout
     return {"message": "Successfully logged out"}
 
 

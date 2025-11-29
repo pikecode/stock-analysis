@@ -11,18 +11,12 @@ const request: AxiosInstance = axios.create({
 // Request interceptor
 request.interceptors.request.use(
   (config) => {
-    console.log(`[API请求] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
-      data: config.data,
-    })
-
     // 根据请求路径选择正确的 token（管理员还是客户端）
     let token: string | null = null
     if (config.url?.includes('/admin')) {
       token = localStorage.getItem('admin_access_token')
-      console.log('[API请求] 使用 admin_access_token')
     } else {
       token = localStorage.getItem('client_access_token')
-      console.log('[API请求] 使用 client_access_token')
     }
 
     if (token) {
@@ -31,7 +25,6 @@ request.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('[API请求] 配置错误:', error)
     return Promise.reject(error)
   }
 )
@@ -42,12 +35,6 @@ request.interceptors.response.use(
     return response.data
   },
   async (error: AxiosError) => {
-    console.error('API 请求错误:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-    })
 
     if (error.response) {
       const status = error.response.status
@@ -60,7 +47,13 @@ request.interceptors.response.use(
           break
 
         case 401:
-          // 根据请求路径选择要刷新的 token
+          // Special handling for login failures - show error without redirect
+          if (error.config?.url?.includes('/auth/login')) {
+            ElMessage.error(data.detail || '用户名或密码错误')
+            break
+          }
+
+          // For other 401 errors, try to refresh token
           const isAdminPath = error.config?.url?.includes('/admin')
           const tokenKey = isAdminPath ? 'admin_refresh_token' : 'client_refresh_token'
           const accessTokenKey = isAdminPath ? 'admin_access_token' : 'client_access_token'
@@ -68,14 +61,12 @@ request.interceptors.response.use(
 
           if (refreshToken && !error.config?.url?.includes('/auth/')) {
             try {
-              console.log(`[API] 尝试刷新 ${isAdminPath ? 'admin' : 'client'} token...`)
               const res = await axios.post(`${baseURL}/auth/refresh`, {
                 refresh_token: refreshToken,
               })
               const { access_token, refresh_token } = res.data
               localStorage.setItem(accessTokenKey, access_token)
               localStorage.setItem(tokenKey, refresh_token)
-              console.log(`[API] ${isAdminPath ? 'admin' : 'client'} token 刷新成功`)
 
               // Retry original request
               if (error.config) {
@@ -84,7 +75,6 @@ request.interceptors.response.use(
               }
             } catch {
               // Refresh failed, logout
-              console.error(`[API] ${isAdminPath ? 'admin' : 'client'} token 刷新失败`)
               localStorage.removeItem(accessTokenKey)
               localStorage.removeItem(tokenKey)
               ElMessage.error('登录已过期，请重新登录')
@@ -115,11 +105,9 @@ request.interceptors.response.use(
       }
     } else if (error.request) {
       // 请求已发送但没有收到响应
-      console.error('网络请求失败 - 没有收到响应:', error.request)
       ElMessage.error('网络连接失败，请检查网络设置')
     } else {
       // 请求配置出错
-      console.error('请求配置错误:', error.message)
       ElMessage.error('请求出错，请稍后重试')
     }
 

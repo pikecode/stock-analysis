@@ -9,12 +9,8 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-// 页面加载时输出调试信息
 onMounted(() => {
-  console.clear()
-  console.log('%c✅ AdminLogin 页面已加载', 'color: green; font-size: 14px; font-weight: bold;')
-  console.log('当前路由:', route.path)
-  console.log('authStore 已初始化')
+  // Component mounted
 })
 
 const form = ref({
@@ -25,54 +21,33 @@ const form = ref({
 const loading = ref(false)
 
 const handleLogin = async () => {
-  console.log('🔵 [AdminLogin] handleLogin 被调用了!')
-  console.log('🔵 [AdminLogin] 表单数据:', { username: form.value.username })
-
   if (!form.value.username || !form.value.password) {
-    console.warn('❌ 用户名或密码为空')
     ElMessage.warning('请输入用户名和密码')
     return
   }
 
-  console.log('✓ 表单数据有效，开始登录...')
   loading.value = true
 
   try {
-    console.log('➡️ 开始调用 authStore.login(form, "admin")...')
     const success = await authStore.login(form.value, 'admin')
-    console.log('⬅️ authStore.login() 完成，结果:', success)
 
     if (!success) {
-      console.error('❌ 登录失败')
       ElMessage.error('用户名或密码错误')
       return
     }
 
-    // 检查是否是管理员（通过 adminUser 的角色字段）
-    console.log('🔍 检查用户角色，adminUser.role:', authStore.adminUser?.role)
     if (authStore.adminUser?.role !== 'ADMIN') {
-      console.error('❌ 用户不是管理员，角色为:', authStore.adminUser?.role || '未知')
       ElMessage.error(`此页面仅限管理员访问。您的角色为: ${authStore.adminUser?.role || '未知'}`)
       await authStore.logout('admin')
-      // 清空表单
       form.value.username = ''
       form.value.password = ''
       return
     }
 
-    console.log('✅ 管理员登录成功！')
     ElMessage.success('登录成功')
-
     const redirect = (route.query.redirect as string) || '/admin'
-    console.log('📍 重定向到:', redirect)
     router.push(redirect)
   } catch (error: any) {
-    console.error('💥 登录异常:', error)
-    console.error('💥 错误详情:', {
-      message: error?.message,
-      response: error?.response?.data,
-      status: error?.response?.status,
-    })
     ElMessage.error('登录失败，请检查用户名和密码')
   } finally {
     loading.value = false

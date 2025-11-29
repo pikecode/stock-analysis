@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { stockApi } from '@/api'
 import type { Stock } from '@/types'
 
@@ -50,9 +51,19 @@ const fetchStocks = async () => {
     })
     stocks.value = response.items
     total.value = response.total
-  } catch (error) {
-    console.error('Failed to fetch stocks:', error)
+
+    if (stocks.value.length === 0 && searchKeyword.value) {
+      ElMessage.info('未找到匹配的股票')
+    }
+  } catch (error: any) {
+    console.error('Failed to fetch stocks:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
+    ElMessage.error('获取股票列表失败，请稍后重试')
     stocks.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -68,14 +79,6 @@ const handleSearch = () => {
 const handlePageChange = (page: number) => {
   currentPage.value = page
   fetchStocks()
-}
-
-// 查看详情
-const viewDetail = (stock: Stock) => {
-  router.push({
-    name: 'PublicStockDetail',
-    params: { code: stock.stock_code }
-  })
 }
 
 </script>
@@ -121,12 +124,21 @@ const viewDetail = (stock: Stock) => {
         <el-table :data="stocks" stripe style="width: 100%">
           <el-table-column prop="stock_code" label="股票代码" width="120" />
           <el-table-column prop="stock_name" label="股票名称" width="150" />
-          <el-table-column prop="exchange_prefix" label="交易所" width="100" />
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="所属概念" min-width="300">
             <template #default="{ row }">
-              <el-button type="primary" link @click="viewDetail(row)">
-                查看详情
-              </el-button>
+              <div class="concepts-cell">
+                <div v-if="row.concepts && row.concepts.length > 0" class="concepts-tags">
+                  <el-tag
+                    v-for="concept in row.concepts"
+                    :key="concept.id"
+                    size="small"
+                    effect="light"
+                  >
+                    {{ concept.concept_name }}
+                  </el-tag>
+                </div>
+                <span v-else class="no-concepts">-</span>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -156,7 +168,6 @@ const viewDetail = (stock: Stock) => {
             v-for="stock in stocks"
             :key="stock.stock_code"
             class="stock-card"
-            @click="viewDetail(stock)"
           >
             <div class="card-header">
               <div class="stock-info">
@@ -166,18 +177,21 @@ const viewDetail = (stock: Stock) => {
             </div>
             <div class="card-body">
               <div class="info-row">
-                <span class="label">交易所</span>
-                <span class="value">{{ stock.exchange_prefix || '-' }}</span>
+                <span class="label">所属概念</span>
               </div>
-              <div class="info-row">
-                <span class="label">创建时间</span>
-                <span class="value">{{ stock.created_at }}</span>
+              <div class="concepts-mobile">
+                <div v-if="stock.concepts && stock.concepts.length > 0" class="concepts-tags-mobile">
+                  <el-tag
+                    v-for="concept in stock.concepts"
+                    :key="concept.id"
+                    size="small"
+                    effect="light"
+                  >
+                    {{ concept.concept_name }}
+                  </el-tag>
+                </div>
+                <span v-else class="no-concepts">暂无概念分类</span>
               </div>
-            </div>
-            <div class="card-footer">
-              <el-button type="primary" size="small" @click.stop="viewDetail(stock)">
-                查看详情
-              </el-button>
             </div>
           </div>
         </div>
@@ -296,14 +310,7 @@ h1 {
   background: white;
   border-radius: 8px;
   padding: 12px;
-  cursor: pointer;
-  transition: box-shadow 0.3s, transform 0.3s;
   border: 1px solid #f0f0f0;
-}
-
-.stock-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
@@ -371,14 +378,33 @@ h1 {
   color: #303133;
 }
 
-.card-footer {
+.concepts-cell {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.card-footer :deep(.el-button) {
-  flex: 1;
-  margin: 0;
+.concepts-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.concepts-mobile {
+  margin-top: 8px;
+}
+
+.concepts-tags-mobile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.no-concepts {
+  color: #909399;
+  font-size: 14px;
 }
 
 .loading-container {
@@ -473,10 +499,6 @@ h1 {
   .stock-card {
     padding: 16px;
     border-radius: 8px;
-  }
-
-  .stock-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .stock-code {

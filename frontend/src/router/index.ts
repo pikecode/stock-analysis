@@ -271,28 +271,18 @@ router.beforeEach((to, _from, next) => {
   const hasAdminToken = !!adminToken
   const hasClientToken = !!clientToken
 
-  console.log('[Router Guard] 路由检查:', {
-    path: to.path,
-    isAdminPath,
-    hasAdminToken,
-    hasClientToken,
-    requiresAuth,
-  })
-
   // 1. 需要登录但没有相应的 token
   // 允许跨身份认证：用户可以访问另一个身份的登录页面来切换认证
   if (requiresAuth) {
     if (isAdminPath && !hasAdminToken) {
       // 管理员路径需要 admin token，重定向到管理员登录页面
       // 允许客户端用户访问 /admin-login 来登录为管理员
-      console.log('[Router Guard] 管理员路径需要 admin token，重定向到管理员登录页')
       next({ name: 'AdminLogin', query: { redirect: to.fullPath } })
       return
     }
     if (!isAdminPath && !hasClientToken) {
       // 客户端路径需要 client token，重定向到客户端登录页面
       // 允许管理员用户访问 /login 来登录为客户端
-      console.log('[Router Guard] 客户端路径需要 client token，重定向到登录页')
       next({ name: 'Login', query: { redirect: to.fullPath } })
       return
     }
@@ -302,14 +292,12 @@ router.beforeEach((to, _from, next) => {
   // 允许跨身份认证：客户端用户可以访问 /admin-login 来登录为管理员，反之亦然
   if (to.name === 'Login' && hasClientToken) {
     // 客户端用户访问 /login，已有客户端登录，重定向到主页
-    console.log('[Router Guard] Client user 已登录，重定向到 /')
     next({ path: '/' })
     return
   }
 
   if (to.name === 'AdminLogin' && hasAdminToken) {
     // 管理员用户访问 /admin-login，已有管理员登录，重定向到管理员页面
-    console.log('[Router Guard] Admin user 已登录，重定向到 /admin')
     next({ path: '/admin' })
     return
   }
@@ -326,12 +314,10 @@ router.beforeEach((to, _from, next) => {
   if (requiredRole && (hasAdminToken || hasClientToken)) {
     // 对于 'customer' 角色，检查是否有 client token（不检查具体的 role 值）
     if (isRequiredRoleCustomer && hasClientToken) {
-      console.log('[Router Guard] 客户端用户已验证，继续检查订阅状态...')
       // 确保用户信息已加载
       if (!authStore.clientUser) {
         authStore.fetchClientUser().then(() => {
           if (requiresSubscription && !authStore.hasValidSubscription) {
-            console.warn('User subscription expired or invalid')
             next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
           } else {
             next()
@@ -343,7 +329,6 @@ router.beforeEach((to, _from, next) => {
         })
       } else {
         if (requiresSubscription && !authStore.hasValidSubscription) {
-          console.warn('User subscription expired or invalid')
           next({ name: 'SubscriptionExpired', query: { redirect: to.fullPath } })
         } else {
           next()

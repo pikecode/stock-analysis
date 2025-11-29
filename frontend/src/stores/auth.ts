@@ -13,8 +13,9 @@ export const useAuthStore = defineStore('auth', () => {
   // 当前活跃用户（根据已登录的身份确定）
   const user = computed(() => adminUser.value || clientUser.value)
 
-  const isAdminLoggedIn = computed(() => !!localStorage.getItem('admin_access_token'))
-  const isClientLoggedIn = computed(() => !!localStorage.getItem('client_access_token'))
+  // Use reactive user objects instead of localStorage for login state
+  const isAdminLoggedIn = computed(() => !!adminUser.value)
+  const isClientLoggedIn = computed(() => !!clientUser.value)
   const isLoggedIn = computed(() => isAdminLoggedIn.value || isClientLoggedIn.value)
 
   const isAdmin = computed(() => adminUser.value?.role === 'ADMIN')
@@ -25,47 +26,31 @@ export const useAuthStore = defineStore('auth', () => {
   const subscriptionDaysRemaining = computed(() => subscription.value?.days_remaining ?? 0)
 
   async function login(credentials: LoginRequest, loginType: 'admin' | 'client' = 'client') {
-    console.log('🟠 [Auth Store] login() 被调用，凭证:', { username: credentials.username, loginType })
     loading.value = true
     try {
-      console.log('🟠 [Auth Store] 正在调用 authApi.login()...')
       const res = await authApi.login(credentials)
-      console.log('🟠 [Auth Store] authApi.login() 返回:', res)
 
       // 根据登录类型分别存储 token
       if (loginType === 'admin') {
         localStorage.setItem('admin_access_token', res.access_token)
         localStorage.setItem('admin_refresh_token', res.refresh_token)
-        console.log('🟠 [Auth Store] Admin Token已保存到localStorage')
         try {
           await fetchAdminUser()
-          console.log('🟠 [Auth Store] Admin 用户信息已加载')
         } catch (fetchError) {
-          console.error('🟠 [Auth Store] 获取 Admin 用户信息失败:', fetchError)
           return false
         }
       } else {
         localStorage.setItem('client_access_token', res.access_token)
         localStorage.setItem('client_refresh_token', res.refresh_token)
-        console.log('🟠 [Auth Store] Client Token已保存到localStorage')
         try {
           await fetchClientUser()
-          console.log('🟠 [Auth Store] Client 用户信息已加载')
         } catch (fetchError) {
-          console.error('🟠 [Auth Store] 获取 Client 用户信息失败:', fetchError)
           return false
         }
       }
 
-      console.log('🟠 [Auth Store] 登录完全成功，用户信息:', user.value)
       return true
     } catch (error: any) {
-      console.error('🟠 [Auth Store] 登录异常:', error)
-      console.error('🟠 [Auth Store] 错误详情:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-      })
       return false
     } finally {
       loading.value = false
@@ -95,14 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchAdminUser() {
     const token = localStorage.getItem('admin_access_token')
     if (!token) {
-      console.warn('[Auth Store] fetchAdminUser: 没有 admin_access_token')
       adminUser.value = null
       return
     }
     try {
-      console.log('[Auth Store] 正在获取 admin 用户信息...')
-      // 使用 admin token 调用 getMe
-      // 创建一个临时请求实例，明确使用 admin token
       const response = await fetch('/api/v1/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -112,9 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       adminUser.value = await response.json()
-      console.log('[Auth Store] admin 用户信息获取成功:', adminUser.value)
     } catch (error) {
-      console.error('[Auth Store] 获取 admin 用户信息失败:', error)
       adminUser.value = null
       localStorage.removeItem('admin_access_token')
       localStorage.removeItem('admin_refresh_token')
@@ -125,14 +104,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchClientUser() {
     const token = localStorage.getItem('client_access_token')
     if (!token) {
-      console.warn('[Auth Store] fetchClientUser: 没有 client_access_token')
       clientUser.value = null
       return
     }
     try {
-      console.log('[Auth Store] 正在获取 client 用户信息...')
-      // 使用 client token 调用 getMe
-      // 创建一个临时请求实例，明确使用 client token
       const response = await fetch('/api/v1/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -142,11 +117,9 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       clientUser.value = await response.json()
-      console.log('[Auth Store] client 用户信息获取成功:', clientUser.value)
       // Also fetch subscription status
       await fetchSubscription()
     } catch (error) {
-      console.error('[Auth Store] 获取 client 用户信息失败:', error)
       clientUser.value = null
       localStorage.removeItem('client_access_token')
       localStorage.removeItem('client_refresh_token')
