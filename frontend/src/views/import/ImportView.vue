@@ -151,11 +151,11 @@ const stopPolling = () => {
 
 const resetForm = () => {
   fileList.value = []
-  formData.value.metric_code = ''
   uploading.value = false
   currentBatchId.value = null
   currentBatch.value = null
   uploadProgress.value = 0
+  // Keep metric_code and file_type for next import
 }
 
 const handleUpload = async () => {
