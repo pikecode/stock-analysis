@@ -59,9 +59,15 @@ const formatFileSize = (bytes: number) => {
 
 const fetchMetrics = async () => {
   try {
-    metrics.value = await importApi.getMetrics()
+    const allMetrics = await importApi.getMetrics()
+    // 只保留 TTV 和 EEE 两个指标
+    metrics.value = allMetrics.filter((m: MetricType) => ['TTV', 'EEE'].includes(m.code))
   } catch {
-    metrics.value = []
+    // 如果API失败，使用默认的两个指标
+    metrics.value = [
+      { id: 1, code: 'TTV', name: '成交金额', file_pattern: 'TTV' },
+      { id: 2, code: 'EEE', name: '活跃度', file_pattern: 'EEE' }
+    ]
   }
 }
 
@@ -215,26 +221,17 @@ onMounted(fetchMetrics)
     </div>
 
     <div class="import-container">
-      <!-- Steps -->
-      <el-steps :active="activeStep" align-center class="steps-container">
-        <el-step title="选择文件类型" :status="getStepStatus(0)" />
-        <el-step title="配置导入参数" :status="getStepStatus(1)" />
-        <el-step title="选择文件" :status="getStepStatus(2)" />
-        <el-step title="上传并处理" :status="getStepStatus(3)" />
-      </el-steps>
-
-      <el-row :gutter="20" style="margin-top: 30px;">
+      <el-row :gutter="20">
         <!-- Upload Form -->
-        <el-col :xl="16" :lg="18" :md="24" :offset-xl="4" :offset-lg="3">
+        <el-col :xl="14" :lg="16" :md="24" :offset-xl="5" :offset-lg="4">
           <el-card class="upload-card">
             <template #header>
               <div class="card-header">
-                <span>📁 导入向导</span>
-                <span v-if="!uploading" class="card-step">步骤 {{ activeStep + 1 }}/4</span>
+                <span>📁 导入数据</span>
               </div>
             </template>
 
-            <el-form label-width="100px" class="import-form">
+            <el-form label-width="90px" class="import-form">
               <!-- Step 1: File Type Selection -->
               <div class="form-section" v-if="!uploading">
                 <div class="section-title">第1步: 选择文件类型</div>
@@ -267,7 +264,7 @@ onMounted(fetchMetrics)
               <div class="form-section" v-if="!uploading && formData.file_type === 'TXT'">
                 <div class="section-title">第2步: 选择指标类型</div>
                 <el-form-item label="指标类型" required>
-                  <el-radio-group v-model="formData.metric_code" class="metric-radio-group">
+                  <el-radio-group v-model="formData.metric_code" class="metric-radio-group-horizontal">
                     <el-radio
                       v-for="m in metrics"
                       :key="m.code"
@@ -275,15 +272,9 @@ onMounted(fetchMetrics)
                       size="large"
                       border
                     >
-                      <div class="radio-content">
-                        <span class="radio-name">{{ m.name }}</span>
-                        <span class="radio-code">{{ m.code }}</span>
-                      </div>
+                      <span class="radio-name">{{ m.name }}</span>
                     </el-radio>
                   </el-radio-group>
-                  <div class="field-hint">
-                    💡 文件名应包含日期（如: TTV_20240101.txt），日期将自动解析
-                  </div>
                 </el-form-item>
               </div>
 
@@ -484,15 +475,6 @@ onMounted(fetchMetrics)
   max-width: 1400px;
 }
 
-/* Steps indicator */
-.steps-container {
-  margin-bottom: 30px;
-}
-
-:deep(.el-steps) {
-  background: transparent;
-}
-
 /* Upload card */
 .upload-card {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
@@ -504,12 +486,6 @@ onMounted(fetchMetrics)
   align-items: center;
   width: 100%;
   font-weight: 500;
-}
-
-.card-step {
-  font-size: 12px;
-  color: #909399;
-  font-weight: normal;
 }
 
 /* Form sections */
@@ -529,13 +505,10 @@ onMounted(fetchMetrics)
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #409eff;
-  display: inline-block;
 }
 
 /* File type hints */
@@ -615,6 +588,37 @@ onMounted(fetchMetrics)
 }
 
 :deep(.file-type-radio-group .el-radio.is-bordered.is-checked) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+/* Horizontal metric radio group */
+.metric-radio-group-horizontal {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+}
+
+:deep(.metric-radio-group-horizontal .el-radio) {
+  flex: 1;
+  margin-right: 0;
+}
+
+:deep(.metric-radio-group-horizontal .el-radio.is-bordered) {
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 2px solid #dcdfe6;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+:deep(.metric-radio-group-horizontal .el-radio.is-bordered:hover) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+:deep(.metric-radio-group-horizontal .el-radio.is-bordered.is-checked) {
   border-color: #409eff;
   background: #ecf5ff;
 }
@@ -910,6 +914,10 @@ onMounted(fetchMetrics)
 
   :deep(.el-row) {
     row-gap: 20px;
+  }
+
+  :deep(.metric-radio-group-horizontal) {
+    flex-direction: column;
   }
 }
 
