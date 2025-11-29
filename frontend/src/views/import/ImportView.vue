@@ -236,7 +236,7 @@ onMounted(fetchMetrics)
               <div class="form-section" v-if="!uploading">
                 <div class="section-title">第1步: 选择文件类型</div>
                 <el-form-item label="文件类型" required>
-                  <el-radio-group v-model="formData.file_type" class="file-type-radio-group">
+                  <el-radio-group v-model="formData.file_type" class="file-type-radio-group-horizontal">
                     <el-radio
                       v-for="option in fileTypeOptions"
                       :key="option.value"
@@ -244,9 +244,7 @@ onMounted(fetchMetrics)
                       size="large"
                       border
                     >
-                      <div class="radio-content">
-                        <span class="radio-name">{{ option.label }}</span>
-                      </div>
+                      <span class="radio-name">{{ option.label }}</span>
                     </el-radio>
                   </el-radio-group>
                   <div class="file-type-hint">
@@ -563,7 +561,7 @@ onMounted(fetchMetrics)
   background: #ecf5ff;
 }
 
-/* File type radio group */
+/* File type radio group (vertical) */
 .file-type-radio-group {
   width: 100%;
   display: flex;
@@ -589,6 +587,37 @@ onMounted(fetchMetrics)
 }
 
 :deep(.file-type-radio-group .el-radio.is-bordered.is-checked) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+/* File type radio group (horizontal) */
+.file-type-radio-group-horizontal {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+}
+
+:deep(.file-type-radio-group-horizontal .el-radio) {
+  flex: 1;
+  margin-right: 0;
+}
+
+:deep(.file-type-radio-group-horizontal .el-radio.is-bordered) {
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 2px solid #dcdfe6;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+:deep(.file-type-radio-group-horizontal .el-radio.is-bordered:hover) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+:deep(.file-type-radio-group-horizontal .el-radio.is-bordered.is-checked) {
   border-color: #409eff;
   background: #ecf5ff;
 }
@@ -924,6 +953,10 @@ onMounted(fetchMetrics)
   }
 
   :deep(.metric-radio-group-horizontal) {
+    flex-direction: column;
+  }
+
+  :deep(.file-type-radio-group-horizontal) {
     flex-direction: column;
   }
 }
