@@ -5,12 +5,10 @@ import { useAuthStore } from '@/stores'
 import {
   Document,
   Folder,
-  TrendCharts,
   Upload,
   List,
   User,
   SwitchButton,
-  Setting,
   UserFilled,
   Tickets,
 } from '@element-plus/icons-vue'
@@ -23,9 +21,7 @@ const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/admin/stocks')) return '/admin/stocks'
   if (path.startsWith('/admin/concepts')) return '/admin/concepts'
-  if (path.startsWith('/admin/rankings')) return '/admin/rankings'
   if (path.startsWith('/admin/import')) return '/admin/import'
-  if (path.startsWith('/admin/settings')) return '/admin/settings'
   if (path.startsWith('/admin/users')) return '/admin/users'
   if (path.startsWith('/admin/plans')) return '/admin/plans'
   if (path.startsWith('/admin/subscriptions')) return '/admin/subscriptions'
@@ -61,10 +57,6 @@ const handleLogout = async () => {
           <el-icon><Folder /></el-icon>
           <span>概念管理</span>
         </el-menu-item>
-        <el-menu-item index="/admin/rankings">
-          <el-icon><TrendCharts /></el-icon>
-          <span>排名查询</span>
-        </el-menu-item>
 
         <!-- 数据导入 - Admin 专用 -->
         <el-sub-menu index="/admin/import">
@@ -98,12 +90,6 @@ const handleLogout = async () => {
             订阅管理
           </el-menu-item>
         </el-sub-menu>
-
-        <!-- 系统设置 -->
-        <el-menu-item index="/admin/settings">
-          <el-icon><Setting /></el-icon>
-          <span>系统设置</span>
-        </el-menu-item>
       </el-menu>
     </el-aside>
 

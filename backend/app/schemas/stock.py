@@ -60,7 +60,7 @@ class StockListResponse(BaseModel):
     """Stock list response."""
 
     total: int
-    items: list[StockResponse]
+    items: list[StockWithConcepts]
 
 
 class StockWithConcepts(StockResponse):

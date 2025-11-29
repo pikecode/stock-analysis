@@ -29,6 +29,7 @@ export interface Stock {
   exchange_prefix?: string
   exchange_name?: string
   created_at: string
+  concepts?: ConceptBrief[]
 }
 
 export interface StockWithConcepts extends Stock {

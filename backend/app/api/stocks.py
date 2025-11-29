@@ -29,7 +29,7 @@ async def list_stocks(
     page_size: int = Query(20, ge=1, le=1000, description="Page size"),
     db: Session = Depends(get_db),
 ):
-    """Get stock list."""
+    """Get stock list with concepts."""
     query = db.query(Stock)
 
     # Filter by keyword
@@ -50,10 +50,41 @@ async def list_stocks(
     offset = (page - 1) * page_size
     stocks = query.offset(offset).limit(page_size).all()
 
-    return StockListResponse(
-        total=total,
-        items=[StockResponse.model_validate(s) for s in stocks],
-    )
+    # Build response with concepts for each stock
+    items = []
+    for stock in stocks:
+        # Get concepts for this stock
+        concept_ids = (
+            db.query(StockConcept.concept_id)
+            .filter(StockConcept.stock_code == stock.stock_code)
+            .all()
+        )
+        concept_ids = [c[0] for c in concept_ids]
+
+        concepts = []
+        if concept_ids:
+            concepts = db.query(Concept).filter(Concept.id.in_(concept_ids)).all()
+
+        items.append(
+            StockWithConcepts(
+                id=stock.id,
+                stock_code=stock.stock_code,
+                stock_name=stock.stock_name,
+                exchange_prefix=stock.exchange_prefix,
+                exchange_name=stock.exchange_name,
+                created_at=stock.created_at,
+                concepts=[
+                    ConceptBrief(
+                        id=c.id,
+                        concept_name=c.concept_name,
+                        category=c.category,
+                    )
+                    for c in concepts
+                ],
+            )
+        )
+
+    return StockListResponse(total=total, items=items)
 
 
 @router.get("/{stock_code}", response_model=StockWithConcepts)
