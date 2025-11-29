@@ -8,6 +8,7 @@ import { Refresh } from '@element-plus/icons-vue'
 const loading = ref(false)
 const allBatches = ref<ImportBatch[]>([])
 const activeTab = ref('all') // 'all', 'csv', 'txt'
+const activeMetricTab = ref('TTV') // For TXT tab: 'TTV', 'EEE'
 
 const searchParams = ref({
   status: '',
@@ -27,7 +28,8 @@ const batches = computed(() => {
   if (activeTab.value === 'csv') {
     return allBatches.value.filter(b => b.file_type === 'CSV')
   } else if (activeTab.value === 'txt') {
-    return allBatches.value.filter(b => b.file_type === 'TXT')
+    // Further filter by metric type for TXT tab
+    return allBatches.value.filter(b => b.file_type === 'TXT' && b.metric_code === activeMetricTab.value)
   }
   return allBatches.value
 })
@@ -112,7 +114,13 @@ onMounted(fetchData)
       <el-tabs v-model="activeTab">
         <el-tab-pane label="全部" name="all" />
         <el-tab-pane label="CSV (股票-概念关系)" name="csv" />
-        <el-tab-pane label="TXT (指标数据)" name="txt" />
+        <el-tab-pane label="TXT (指标数据)" name="txt">
+          <!-- Sub-tabs for metric types within TXT -->
+          <el-tabs v-model="activeMetricTab" style="margin-top: -10px">
+            <el-tab-pane label="TTV (成交金额)" name="TTV" />
+            <el-tab-pane label="EEE (活跃度)" name="EEE" />
+          </el-tabs>
+        </el-tab-pane>
       </el-tabs>
 
       <div class="search-form">
@@ -154,11 +162,10 @@ onMounted(fetchData)
         </el-table-column>
       </el-table>
 
-      <!-- TXT 专用的完整表格（包含指标、日期、计算状态和重新计算按钮） -->
+      <!-- TXT 专用的完整表格（包含日期、计算状态和重新计算按钮） -->
       <el-table v-if="activeTab === 'txt'" :data="batches" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="file_name" label="文件名" show-overflow-tooltip />
-        <el-table-column prop="metric_code" label="指标" width="100" />
         <el-table-column prop="data_date" label="数据日期" width="120" />
         <el-table-column prop="status" label="导入状态" width="100">
           <template #default="{ row }">
