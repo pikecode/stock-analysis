@@ -22,22 +22,10 @@ const fileTypeOptions = [
 
 const formData = ref({
   file_type: 'TXT',
-  metric_code: '',
+  metric_code: 'EEE', // 默认选择 EEE
 })
 
 const fileList = ref<UploadFile[]>([])
-
-// Grouped metrics for better display
-const groupedMetrics = computed(() => {
-  return metrics.value.reduce((acc, metric) => {
-    const group = '所有指标'
-    if (!acc[group]) {
-      acc[group] = []
-    }
-    acc[group].push(metric)
-    return acc
-  }, {} as Record<string, MetricType[]>)
-})
 
 // Check if upload is allowed
 const canUpload = computed(() => {
@@ -236,8 +224,8 @@ onMounted(fetchMetrics)
       </el-steps>
 
       <el-row :gutter="20" style="margin-top: 30px;">
-        <!-- Left: Upload Form -->
-        <el-col :xl="12" :lg="12" :md="24">
+        <!-- Upload Form -->
+        <el-col :xl="16" :lg="18" :md="24" :offset-xl="4" :offset-lg="3">
           <el-card class="upload-card">
             <template #header>
               <div class="card-header">
@@ -267,30 +255,20 @@ onMounted(fetchMetrics)
               <div class="form-section" v-if="!uploading && formData.file_type === 'TXT'">
                 <div class="section-title">第2步: 选择指标类型</div>
                 <el-form-item label="指标类型" required>
-                  <el-select
-                    v-model="formData.metric_code"
-                    placeholder="选择要导入的指标"
-                    style="width: 100%"
-                    filterable
-                  >
-                    <el-option-group
-                      v-for="(metrics, category) in groupedMetrics"
-                      :key="category"
-                      :label="category"
+                  <el-radio-group v-model="formData.metric_code" class="metric-radio-group">
+                    <el-radio
+                      v-for="m in metrics"
+                      :key="m.code"
+                      :label="m.code"
+                      size="large"
+                      border
                     >
-                      <el-option
-                        v-for="m in metrics"
-                        :key="m.code"
-                        :label="`${m.name} (${m.code})`"
-                        :value="m.code"
-                      >
-                        <div class="metric-option">
-                          <span class="metric-name">{{ m.name }}</span>
-                          <span class="metric-code">{{ m.code }}</span>
-                        </div>
-                      </el-option>
-                    </el-option-group>
-                  </el-select>
+                      <div class="radio-content">
+                        <span class="radio-name">{{ m.name }}</span>
+                        <span class="radio-code">{{ m.code }}</span>
+                      </div>
+                    </el-radio>
+                  </el-radio-group>
                   <div class="field-hint">
                     💡 文件名应包含日期（如: TTV_20240101.txt），日期将自动解析
                   </div>
@@ -461,63 +439,6 @@ onMounted(fetchMetrics)
             </el-form>
           </el-card>
         </el-col>
-
-        <!-- Right: File Format Guide -->
-        <el-col :xl="12" :lg="12" :md="24">
-          <el-card class="guide-card">
-            <template #header>
-              <div class="card-header">
-                <span>📚 文件格式指南</span>
-              </div>
-            </template>
-
-            <!-- CSV Guide -->
-            <div class="guide-section">
-              <div class="guide-title">📄 CSV 文件格式</div>
-              <div class="guide-content">
-                <p class="guide-desc">用于导入股票与概念的关联关系</p>
-                <div class="code-block">
-                  <pre>股票代码,股票名称,概念
-000001,平安银行,银行;金融科技
-600000,浦发银行,银行
-601399,工商银行,银行;国企改革</pre>
-                </div>
-                <ul class="guide-tips">
-                  <li>✓ 第1列: 股票代码（如000001、600000）</li>
-                  <li>✓ 第2列: 股票名称（如平安银行）</li>
-                  <li>✓ 第3列: 概念名称（多个用分号;分隔）</li>
-                </ul>
-              </div>
-            </div>
-
-            <el-divider />
-
-            <!-- TXT Guide -->
-            <div class="guide-section">
-              <div class="guide-title">📈 TXT 文件格式</div>
-              <div class="guide-content">
-                <p class="guide-desc">用于导入每日指标数据，需包含日期</p>
-                <div class="code-block">
-                  <pre>SH600000	1234567.89
-SZ000001	987654.32
-BJ430047	12345.67</pre>
-                </div>
-                <ul class="guide-tips">
-                  <li>✓ 格式: 股票代码(带前缀)[Tab]指标值</li>
-                  <li>✓ 文件名需包含日期，如 TTV_20240101.txt</li>
-                  <li>✓ 支持的指标:</li>
-                </ul>
-              </div>
-            </div>
-
-            <!-- Metrics Table -->
-            <el-table :data="metrics" stripe size="small" class="metrics-table">
-              <el-table-column prop="code" label="代码" width="80" />
-              <el-table-column prop="name" label="指标名称" />
-              <el-table-column prop="file_pattern" label="文件匹配" width="100" />
-            </el-table>
-          </el-card>
-        </el-col>
       </el-row>
     </div>
   </div>
@@ -624,6 +545,59 @@ BJ430047	12345.67</pre>
   padding: 6px 8px;
   background: #f5f7fa;
   border-radius: 3px;
+}
+
+/* Metric radio group */
+.metric-radio-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:deep(.metric-radio-group .el-radio) {
+  margin-right: 0;
+  width: 100%;
+}
+
+:deep(.metric-radio-group .el-radio.is-bordered) {
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 2px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.metric-radio-group .el-radio.is-bordered:hover) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+:deep(.metric-radio-group .el-radio.is-bordered.is-checked) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.radio-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-left: 8px;
+}
+
+.radio-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.radio-code {
+  font-size: 12px;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
 }
 
 /* Upload wrapper */
@@ -869,99 +843,6 @@ BJ430047	12345.67</pre>
   color: #f56c6c;
 }
 
-/* Guide card */
-.guide-card {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  height: 100%;
-}
-
-.guide-section {
-  margin-bottom: 24px;
-}
-
-.guide-section:last-child {
-  margin-bottom: 0;
-}
-
-.guide-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 12px;
-}
-
-.guide-content {
-  font-size: 13px;
-  color: #606266;
-}
-
-.guide-desc {
-  margin: 0 0 12px 0;
-  color: #909399;
-}
-
-.code-block {
-  background: #f5f7fa;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  margin: 12px 0;
-  overflow-x: auto;
-}
-
-.code-block pre {
-  margin: 0;
-  padding: 12px;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #606266;
-}
-
-.guide-tips {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0 0;
-}
-
-.guide-tips li {
-  margin: 6px 0;
-  font-size: 12px;
-  color: #606266;
-  padding-left: 0;
-}
-
-/* Metrics table */
-.metrics-table {
-  margin-top: 16px;
-  font-size: 12px;
-}
-
-:deep(.metrics-table .el-table__header-wrapper thead th) {
-  background: #f5f7fa;
-  font-weight: 600;
-}
-
-:deep(.metrics-table .el-table__body) {
-  font-size: 12px;
-}
-
-/* Metric option in dropdown */
-.metric-option {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.metric-name {
-  flex: 1;
-}
-
-.metric-code {
-  color: #909399;
-  font-size: 12px;
-  margin-left: 8px;
-}
-
 /* Responsive design */
 @media (max-width: 1024px) {
   .import-view {
@@ -1037,14 +918,6 @@ BJ430047	12345.67</pre>
     width: 40px;
     height: 40px;
     font-size: 14px;
-  }
-
-  .code-block pre {
-    font-size: 11px;
-  }
-
-  .guide-card {
-    height: auto;
   }
 
   .card-header {
