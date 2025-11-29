@@ -275,9 +275,6 @@ class OptimizedTXTImportService:
             max_value = values[0] if values else 0
             min_value = values[-1] if values else 0
 
-            # Top10汇总
-            top10_sum = sum(values[:10])
-
             # 中位数
             median_value = self._calculate_median(values)
 
@@ -305,7 +302,6 @@ class OptimizedTXTImportService:
                 'max_value': max_value,
                 'min_value': min_value,
                 'median_value': median_value,
-                'top10_sum': top10_sum,
                 'import_batch_id': batch_id
             })
 

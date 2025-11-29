@@ -130,29 +130,3 @@ class ComputeService:
         self.db.execute(sql, {"batch_id": batch_id})
         self.db.commit()
 
-        # Compute top10_sum for this batch
-        self._compute_top10_sum(batch_id)
-
-    def _compute_top10_sum(self, batch_id: int):
-        """Compute top 10 sum for each concept."""
-        sql = text("""
-            UPDATE concept_daily_summary s
-            SET top10_sum = (
-                SELECT COALESCE(SUM(sub.trade_value), 0)
-                FROM (
-                    SELECT r.trade_value
-                    FROM stock_metric_data_raw r
-                    JOIN stock_concepts sc ON r.stock_code = sc.stock_code
-                    WHERE sc.concept_id = s.concept_id
-                      AND r.trade_date = s.trade_date
-                      AND r.metric_type_id = s.metric_type_id
-                      AND r.is_valid = true
-                    ORDER BY r.trade_value DESC
-                    LIMIT 10
-                ) sub
-            )
-            WHERE s.import_batch_id = :batch_id
-        """)
-
-        self.db.execute(sql, {"batch_id": batch_id})
-        self.db.commit()
