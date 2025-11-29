@@ -14,7 +14,13 @@ class ComputeService:
         self.db = db
 
     def compute_all_for_batch(self, batch_id: int):
-        """Compute rankings and summaries for a batch."""
+        """Recompute rankings and summaries for a batch based on existing raw data.
+
+        This method:
+        1. Clears previous computation results for this batch
+        2. Recomputes rankings and summaries from scratch using the existing raw data
+        3. Updates the batch status
+        """
         # Update status
         batch = self.db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
         if not batch:
@@ -24,10 +30,13 @@ class ComputeService:
         self.db.commit()
 
         try:
-            # Compute rankings
+            # Clear previous computation results for this batch
+            self._clear_previous_results(batch_id)
+
+            # Recompute rankings from raw data
             self.compute_rankings(batch_id)
 
-            # Compute summaries
+            # Recompute summaries from raw data
             self.compute_summaries(batch_id)
 
             # Update status
@@ -40,8 +49,29 @@ class ComputeService:
             self.db.commit()
             raise
 
+    def _clear_previous_results(self, batch_id: int):
+        """Clear previous computation results for this batch."""
+        # Delete from concept_daily_summary
+        sql_summary = text("""
+            DELETE FROM concept_daily_summary
+            WHERE import_batch_id = :batch_id
+        """)
+        self.db.execute(sql_summary, {"batch_id": batch_id})
+
+        # Delete from concept_stock_daily_rank
+        sql_rank = text("""
+            DELETE FROM concept_stock_daily_rank
+            WHERE import_batch_id = :batch_id
+        """)
+        self.db.execute(sql_rank, {"batch_id": batch_id})
+
+        self.db.commit()
+
     def compute_rankings(self, batch_id: int):
-        """Compute stock rankings within concepts."""
+        """Compute stock rankings within concepts from raw data.
+
+        Calculates DENSE_RANK for each stock within its concepts for each trade date.
+        """
         sql = text("""
             INSERT INTO concept_stock_daily_rank (
                 metric_type_id, metric_code, concept_id, stock_code, trade_date,
@@ -63,19 +93,16 @@ class ComputeService:
             JOIN stock_concepts sc ON r.stock_code = sc.stock_code
             WHERE r.import_batch_id = :batch_id
               AND r.is_valid = true
-            ON CONFLICT (metric_type_id, concept_id, stock_code, trade_date)
-            DO UPDATE SET
-                trade_value = EXCLUDED.trade_value,
-                rank = EXCLUDED.rank,
-                computed_at = CURRENT_TIMESTAMP,
-                import_batch_id = EXCLUDED.import_batch_id
         """)
 
         self.db.execute(sql, {"batch_id": batch_id})
         self.db.commit()
 
     def compute_summaries(self, batch_id: int):
-        """Compute concept daily summaries."""
+        """Compute concept daily summaries from raw data.
+
+        Calculates aggregated statistics (total, avg, max, min, median) for each concept on each date.
+        """
         sql = text("""
             INSERT INTO concept_daily_summary (
                 metric_type_id, metric_code, concept_id, trade_date,
@@ -98,21 +125,12 @@ class ComputeService:
             WHERE r.import_batch_id = :batch_id
               AND r.is_valid = true
             GROUP BY r.metric_type_id, r.metric_code, sc.concept_id, r.trade_date
-            ON CONFLICT (metric_type_id, concept_id, trade_date)
-            DO UPDATE SET
-                total_value = EXCLUDED.total_value,
-                avg_value = EXCLUDED.avg_value,
-                max_value = EXCLUDED.max_value,
-                min_value = EXCLUDED.min_value,
-                median_value = EXCLUDED.median_value,
-                computed_at = CURRENT_TIMESTAMP,
-                import_batch_id = EXCLUDED.import_batch_id
         """)
 
         self.db.execute(sql, {"batch_id": batch_id})
         self.db.commit()
 
-        # Compute top10_sum separately
+        # Compute top10_sum for this batch
         self._compute_top10_sum(batch_id)
 
     def _compute_top10_sum(self, batch_id: int):
