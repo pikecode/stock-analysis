@@ -231,7 +231,7 @@ class AsyncImportQueue:
     def __init__(self, max_concurrent_imports: int = 3):
         self.max_concurrent = max_concurrent_imports
         self.import_queue = Queue()
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrent)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrent)
         self.active_imports = {}
         self.lock = threading.Lock()
 

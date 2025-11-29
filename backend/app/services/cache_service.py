@@ -1,7 +1,7 @@
 """缓存服务 - 提高查询性能"""
 import json
 import redis
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Set
 from datetime import date, timedelta
 from functools import wraps
 import hashlib

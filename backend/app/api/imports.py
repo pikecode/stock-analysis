@@ -14,6 +14,7 @@ from app.models.stock import ImportBatch, MetricType
 from app.services.import_service import ImportService
 from app.services.optimized_csv_import import OptimizedCSVImportService
 from app.services.optimized_txt_import import OptimizedTXTImportService
+from app.services.compute_service import ComputeService
 from app.schemas.stock import ImportBatchResponse, ImportUploadResponse
 
 router = APIRouter(prefix="/admin/import", tags=["Import"])
