@@ -238,8 +238,20 @@ onMounted(fetchMetrics)
               <!-- Step 1: File Type Selection -->
               <div class="form-section" v-if="!uploading">
                 <div class="section-title">第1步: 选择文件类型</div>
-                <el-form-item label="文件类型">
-                  <el-segmented v-model="formData.file_type" :options="fileTypeOptions" size="large" />
+                <el-form-item label="文件类型" required>
+                  <el-radio-group v-model="formData.file_type" class="file-type-radio-group">
+                    <el-radio
+                      v-for="option in fileTypeOptions"
+                      :key="option.value"
+                      :label="option.value"
+                      size="large"
+                      border
+                    >
+                      <div class="radio-content">
+                        <span class="radio-name">{{ option.label }}</span>
+                      </div>
+                    </el-radio>
+                  </el-radio-group>
                   <div class="file-type-hint">
                     <span v-if="formData.file_type === 'CSV'">
                       💾 CSV 文件: 导入股票与概念的关联关系（股票代码、股票名称、概念）
@@ -573,6 +585,36 @@ onMounted(fetchMetrics)
 }
 
 :deep(.metric-radio-group .el-radio.is-bordered.is-checked) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+/* File type radio group */
+.file-type-radio-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:deep(.file-type-radio-group .el-radio) {
+  margin-right: 0;
+  width: 100%;
+}
+
+:deep(.file-type-radio-group .el-radio.is-bordered) {
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 2px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.file-type-radio-group .el-radio.is-bordered:hover) {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+:deep(.file-type-radio-group .el-radio.is-bordered.is-checked) {
   border-color: #409eff;
   background: #ecf5ff;
 }
