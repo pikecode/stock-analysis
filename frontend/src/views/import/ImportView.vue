@@ -272,7 +272,8 @@ onMounted(fetchMetrics)
                       size="large"
                       border
                     >
-                      <span class="radio-name">{{ m.name }}</span>
+                      <span class="radio-name">{{ m.code }}</span>
+                      <span class="radio-desc">{{ m.name }}</span>
                     </el-radio>
                   </el-radio-group>
                 </el-form-item>
@@ -633,8 +634,14 @@ onMounted(fetchMetrics)
 
 .radio-name {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #303133;
+}
+
+.radio-desc {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 6px;
 }
 
 .radio-code {
