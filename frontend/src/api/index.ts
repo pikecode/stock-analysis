@@ -53,7 +53,7 @@ export const conceptApi = {
   getDetail(conceptId: number) {
     return request.get<any, Concept>(`/concepts/${conceptId}`)
   },
-  getStocks(conceptId: number, params: { page?: number; page_size?: number }) {
+  getStocks(conceptId: number, params: { page?: number; page_size?: number; trade_date?: string; metric_code?: string }) {
     return request.get<any, any>(`/concepts/${conceptId}/stocks`, { params })
   },
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Search, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { reportApi, conceptApi } from '@/api'
+import { reportApi, conceptApi, stockApi } from '@/api'
 import dayjs from 'dayjs'
 import StockRankingChart from '@/components/StockRankingChart.vue'
 import ConceptDailyTradeChart from '@/components/ConceptDailyTradeChart.vue'
@@ -52,6 +52,10 @@ const metricCode = ref('EEE')
 const queryResult = ref<QueryResult | null>(null)
 const hasSearched = ref(false)
 
+// 股票列表
+const stockList = ref<StockItem[]>([])
+const stockLoading = ref(false)
+
 // 当前选中的概念
 const selectedConcept = ref<ConceptRankedItem | null>(null)
 
@@ -64,15 +68,8 @@ const chartEndDate = ref('')
 const chartDateRange = ref<string[]>([])
 
 // 控制图表显示
-const showRankingChart = ref(false)
-const showDailyTradeChart = ref(false)
-
-// 度量指标选项
-const metricOptions = [
-  { label: 'EEE - 行业活跃度', value: 'EEE' },
-  { label: 'TTV - 交易交易量', value: 'TTV' },
-  { label: 'TOP - Top指标', value: 'TOP' },
-]
+const showRankingChart = ref(true) // 默认选中排名趋势图
+const showDailyTradeChart = ref(true) // 默认选中每日交易总和
 
 // 用于显示的数据
 const stockInfo = computed(() => {
@@ -203,12 +200,18 @@ const loadConceptStocks = async (concept: ConceptRankedItem) => {
   concept.stocks = []
 
   try {
+    console.log('Loading concept stocks with params:', {
+      concept_id: concept.id,
+      trade_date: selectedDate.value,
+      metric_code: metricCode.value,
+    })
     const response = await conceptApi.getStocks(concept.id, {
       page: 1,
       page_size: 10,
       trade_date: selectedDate.value,
       metric_code: metricCode.value,
     })
+    console.log('Concept stocks response:', response)
 
     if (response && response.stocks) {
       concept.stocks = response.stocks
@@ -262,9 +265,9 @@ const selectConcept = async (concept: ConceptRankedItem) => {
     chartDateRange.value = [chartStartDate.value, chartEndDate.value]
   }
 
-  // 默认显示排名趋势图
+  // 默认显示两个图表
   showRankingChart.value = true
-  showDailyTradeChart.value = false
+  showDailyTradeChart.value = true
 
   // 加载该概念下的股票列表
   if (!concept.stocks) {
@@ -306,6 +309,40 @@ watch(expandedConceptId, (newId) => {
     }
   }
 })
+
+// 加载股票列表（初始化或远程搜索）
+const loadStocks = async (keyword: string = '') => {
+  stockLoading.value = true
+  try {
+    const response = await stockApi.getList({
+      keyword: keyword.trim(),
+      page_size: keyword ? 50 : 20, // 搜索时返回更多结果
+    })
+    stockList.value = response.items.map((item: any) => ({
+      stock_code: item.stock_code,
+      stock_name: item.stock_name,
+    }))
+  } catch (error) {
+    console.error('加载股票列表失败:', error)
+    stockList.value = []
+  } finally {
+    stockLoading.value = false
+  }
+}
+
+// 远程搜索方法
+const handleStockSearch = (query: string) => {
+  if (query) {
+    loadStocks(query)
+  } else {
+    loadStocks()
+  }
+}
+
+// 组件挂载时加载初始股票列表
+onMounted(() => {
+  loadStocks()
+})
 </script>
 
 <template>
@@ -320,72 +357,51 @@ watch(expandedConceptId, (newId) => {
 
       <!-- 查询表单 -->
       <div class="query-form">
-        <!-- 第一行：股票代码 -->
-        <div class="form-row">
-          <el-input
+        <!-- 股票代码和日期在同一行 -->
+        <div class="form-row compact">
+          <el-select
             v-model="searchCode"
-            placeholder="输入股票代码（如：600519）"
-            size="large"
+            filterable
+            remote
+            reserve-keyword
+            :remote-method="handleStockSearch"
+            :loading="stockLoading"
+            placeholder="输入股票代码或名称搜索"
             clearable
-            @keyup="handleKeyup"
+            class="code-input"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
-          </el-input>
-        </div>
-
-        <!-- 第二行：日期和指标 -->
-        <div class="form-row filters">
-          <!-- 日期选择 -->
-          <div class="date-selector">
-            <label class="filter-label">📅 查询日期：</label>
-            <el-date-picker
-              v-model="selectedDate"
-              type="date"
-              placeholder="选择日期"
-              size="large"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="flex: 1"
+            <el-option
+              v-for="stock in stockList"
+              :key="stock.stock_code"
+              :label="`${stock.stock_code} - ${stock.stock_name}`"
+              :value="stock.stock_code"
             />
-          </div>
+          </el-select>
 
-          <!-- 度量指标选择 -->
-          <div class="metric-selector">
-            <label class="filter-label">📊 度量指标：</label>
-            <el-select
-              v-model="metricCode"
-              placeholder="选择指标"
-              size="large"
-              style="flex: 1"
-            >
-              <el-option
-                v-for="option in metricOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </el-select>
-          </div>
-        </div>
+          <el-date-picker
+            v-model="selectedDate"
+            type="date"
+            placeholder="选择日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            class="date-input"
+          />
 
-        <!-- 第三行：按钮 -->
-        <div class="form-row buttons">
           <el-button
             type="primary"
-            size="large"
             :loading="searching"
             @click="handleSearch"
-            style="flex: 1"
+            class="search-btn"
           >
             查询
           </el-button>
           <el-button
-            type="info"
-            plain
-            size="large"
+            :disabled="searching"
             @click="clearSearch"
+            class="clear-btn"
           >
             清空
           </el-button>
@@ -759,13 +775,19 @@ watch(expandedConceptId, (newId) => {
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 0;
+  gap: 24px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  min-height: 100vh;
 }
 
 /* 查询卡片 */
 .query-card {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .query-form {
@@ -774,61 +796,52 @@ watch(expandedConceptId, (newId) => {
   gap: 16px;
 }
 
-.form-row {
+.form-row.compact {
   display: flex;
   gap: 12px;
   align-items: center;
-}
-
-.form-row.filters {
-  gap: 20px;
   flex-wrap: wrap;
 }
 
-.date-selector,
-.metric-selector {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.code-input {
   flex: 1;
-  min-width: 280px;
+  min-width: 200px;
 }
 
-.filter-label {
-  font-weight: 500;
-  color: #606266;
+.date-input {
+  width: 180px;
+}
+
+.search-btn {
+  min-width: 100px;
+}
+
+.clear-btn {
   min-width: 80px;
 }
 
-.date-selector :deep(.el-date-picker),
-.metric-selector :deep(.el-select) {
-  width: 100%;
-}
-
-.form-row.buttons {
-  justify-content: flex-start;
-  gap: 12px;
-}
-
-.form-row.buttons :deep(.el-button) {
-  min-width: 120px;
-}
-
 .quick-date-buttons {
-  padding: 8px 0;
+  padding: 12px 0;
   text-align: center;
   border-top: 1px solid #ebeef5;
   margin-top: 8px;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  border-radius: 8px;
 }
 
 .quick-date-buttons :deep(.el-button) {
   font-size: 13px;
-  padding: 6px 8px;
+  padding: 6px 12px;
+  font-weight: 500;
 }
 
 /* 结果卡片 */
 .result-card {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .card-header {
@@ -841,16 +854,21 @@ watch(expandedConceptId, (newId) => {
 
 .title {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .result-meta {
   font-size: 12px;
-  color: #909399;
-  background: #f5f7fa;
-  padding: 4px 12px;
-  border-radius: 4px;
+  color: #606266;
+  background: linear-gradient(135deg, #e8ecf1 0%, #f5f7fa 100%);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 500;
+  border: 1px solid #e4e7ed;
 }
 
 /* 结果内容 */
@@ -861,10 +879,11 @@ watch(expandedConceptId, (newId) => {
 }
 
 .stock-info {
-  background: linear-gradient(135deg, #f5f7fa 0%, #f9fafb 100%);
-  padding: 16px;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%);
+  padding: 20px;
+  border-radius: 12px;
   border-left: 4px solid #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
 }
 
 .info-grid {
@@ -1026,34 +1045,59 @@ watch(expandedConceptId, (newId) => {
 }
 
 .empty-state {
-  padding: 40px 20px;
+  padding: 60px 20px;
   text-align: center;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  border-radius: 12px;
+  border: 2px dashed #e4e7ed;
+}
+
+.empty-state :deep(.el-empty__image) {
+  width: 120px;
+  height: 120px;
+}
+
+.empty-state :deep(.el-empty__description) {
+  font-size: 15px;
+  color: #606266;
+  margin-top: 16px;
 }
 
 .loading-state {
-  padding: 20px;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  border-radius: 12px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .form-row.filters {
+  .dashboard {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .query-card,
+  .result-card {
+    margin-bottom: 16px;
+    border-radius: 8px;
+  }
+
+  .form-row.compact {
     flex-direction: column;
     gap: 12px;
   }
 
-  .date-selector,
-  .metric-selector {
-    flex-direction: column;
-    align-items: flex-start;
+  .code-input {
+    width: 100%;
     min-width: 100%;
   }
 
-  .filter-label {
-    min-width: auto;
+  .date-input {
+    width: 100%;
   }
 
-  .date-selector :deep(.el-date-picker),
-  .metric-selector :deep(.el-select) {
+  .search-btn,
+  .clear-btn {
     width: 100%;
   }
 
@@ -1064,20 +1108,47 @@ watch(expandedConceptId, (newId) => {
   .info-item {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
   }
 
   .label {
     min-width: auto;
+    font-size: 12px;
+  }
+
+  .value {
+    font-size: 13px;
   }
 
   .card-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 14px;
   }
 
   .result-meta {
-    font-size: 12px;
+    font-size: 11px;
     margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .stock-info {
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .concept-item {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .empty-state {
+    padding: 40px 16px;
   }
 
   :deep(.el-table) {
@@ -1157,6 +1228,10 @@ watch(expandedConceptId, (newId) => {
 /* 概念列表卡片 */
 .concept-list-card {
   height: 100%;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .concept-list {
@@ -1165,26 +1240,48 @@ watch(expandedConceptId, (newId) => {
 }
 
 .concept-item {
-  padding: 12px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  padding: 16px;
+  border: 2px solid #ebeef5;
+  border-radius: 10px;
+  margin-bottom: 12px;
   cursor: pointer;
-  transition: all 0.3s;
-  background-color: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(135deg, #fff 0%, #f9fafb 100%);
+  position: relative;
+}
+
+.concept-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409eff 0%, #66b1ff 100%);
+  border-radius: 10px 10px 0 0;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .concept-item:hover {
   border-color: #409eff;
-  background-color: #ecf5ff;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.2);
+}
+
+.concept-item:hover::before {
+  opacity: 1;
 }
 
 .concept-item.active {
   border-color: #409eff;
-  background-color: #ecf5ff;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  background: linear-gradient(135deg, #ecf5ff 0%, #e6f4ff 100%);
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.3);
+}
+
+.concept-item.active::before {
+  opacity: 1;
 }
 
 .concept-item-header {
@@ -1224,6 +1321,10 @@ watch(expandedConceptId, (newId) => {
 .concept-detail-card {
   height: 100%;
   min-height: 600px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .concept-detail-placeholder {
@@ -1232,6 +1333,10 @@ watch(expandedConceptId, (newId) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  border: 2px dashed #e4e7ed;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
 }
 
 .concept-basic-info {

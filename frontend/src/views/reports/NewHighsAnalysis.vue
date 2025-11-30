@@ -362,50 +362,51 @@ const closeChartDialog = () => {
     <el-card class="query-panel">
       <template #header>
         <div class="card-header">
-          <span>创新高概念分析</span>
+          <span class="header-title">📊 创新高概念分析</span>
         </div>
       </template>
 
       <div class="query-form">
-        <!-- 日期选择 -->
-        <div class="form-group">
-          <label>日期区间</label>
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            :picker-options="pickerOptions"
-            class="date-picker"
-          />
-        </div>
+        <!-- 日期选择和快速选择在一行 -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>日期区间</label>
+            <el-date-picker
+              v-model="dateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              :picker-options="pickerOptions"
+              class="date-picker"
+            />
+          </div>
 
-        <!-- 快速选择 -->
-        <div class="form-group">
-          <label>快速选择</label>
-          <div class="quick-select">
-            <el-button
-              v-for="d in [7, 10, 30]"
-              :key="d"
-              :type="days === d ? 'primary' : 'default'"
-              size="small"
-              @click="handleQuickSelect(d)"
-            >
-              最近 {{ d }} 天
-            </el-button>
+          <div class="form-group">
+            <label>快速选择</label>
+            <div class="quick-select">
+              <el-button
+                v-for="d in [7, 10, 30]"
+                :key="d"
+                :type="days === d ? 'primary' : 'default'"
+                size="small"
+                @click="handleQuickSelect(d)"
+              >
+                {{ d }}天
+              </el-button>
+            </div>
           </div>
         </div>
 
         <!-- 查询和清空按钮 -->
-        <div class="form-group form-btn-group">
-          <el-button type="primary" :loading="loading" @click="handleSearch">
+        <div class="form-actions">
+          <el-button type="primary" :loading="loading" @click="handleSearch" size="large">
             <el-icon><Search /></el-icon>
-            查询创新高
+            <span>查询创新高</span>
           </el-button>
-          <el-button v-if="results.length > 0" :disabled="loading" @click="handleReset">
+          <el-button v-if="results.length > 0" :disabled="loading" @click="handleReset" size="large">
             <el-icon><Delete /></el-icon>
-            清空
+            <span>清空</span>
           </el-button>
         </div>
       </div>
@@ -415,28 +416,45 @@ const closeChartDialog = () => {
     <el-card v-if="results.length > 0" class="results-panel">
       <template #header>
         <div class="card-header">
-          <span>{{ results.length }} 个创新高概念</span>
+          <span class="header-title">🎯 发现 {{ results.length }} 个创新高概念</span>
         </div>
       </template>
 
       <div class="results-list">
-        <div v-for="concept in results" :key="concept.concept_id" class="concept-item">
+        <div
+          v-for="(concept, index) in results"
+          :key="concept.concept_id"
+          class="concept-item"
+          :class="{ 'rank-top': index < 3 }"
+        >
           <!-- 概念头部 -->
           <div class="concept-header" @click="toggleExpand(concept.concept_id)">
-            <div class="concept-title">
-              <span class="expand-icon" :class="{ expanded: expandedRows.has(concept.concept_id) }">
-                ▼
-              </span>
-              <span class="concept-name">{{ concept.concept_name }}</span>
-              <el-tag type="success" class="new-high-tag">创新高</el-tag>
+            <!-- 排名徽章 -->
+            <div class="rank-medal" v-if="index < 3">
+              <span v-if="index === 0" class="medal gold">🥇</span>
+              <span v-else-if="index === 1" class="medal silver">🥈</span>
+              <span v-else-if="index === 2" class="medal bronze">🥉</span>
             </div>
-            <div class="concept-stats">
-              <span class="stat">
-                总交易量：<strong>{{ formatValue(concept.total_trade_value) }}</strong>
-              </span>
-              <span class="stat">
-                排名：<strong class="rank-badge">第 {{ concept.daily_rank }} 位</strong>
-              </span>
+            <div v-else class="rank-number">{{ index + 1 }}</div>
+
+            <div class="concept-content">
+              <div class="concept-title">
+                <span class="expand-icon" :class="{ expanded: expandedRows.has(concept.concept_id) }">
+                  ▼
+                </span>
+                <span class="concept-name">{{ concept.concept_name }}</span>
+                <el-tag type="success" size="small" class="new-high-tag">新高</el-tag>
+              </div>
+              <div class="concept-stats">
+                <div class="stat-item">
+                  <span class="stat-label">交易量</span>
+                  <span class="stat-value">{{ formatValue(concept.total_trade_value) }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">成分股</span>
+                  <span class="stat-value">{{ concept.stocks.length }} 只</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -516,23 +534,24 @@ const closeChartDialog = () => {
     </el-card>
 
     <!-- 空状态 -->
-    <div v-if="!loading && results.length === 0" class="empty-state">
-      <el-empty
-        description="暂无数据"
-        image="search"
-      >
-        <template #default>
-          <p style="margin-top: 12px; color: #606266;">
-            请选择日期区间后点击"查询创新高"按钮
-          </p>
-        </template>
-      </el-empty>
-    </div>
+    <el-card v-if="!loading && results.length === 0" class="empty-state-card">
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">开始查询创新高概念</div>
+        <div class="empty-desc">选择日期区间，点击"查询创新高"按钮开始分析</div>
+        <div class="empty-tips">
+          <div class="tip-item">💡 建议使用最近 10-30 天的数据</div>
+          <div class="tip-item">📈 数据每日更新，反映最新市场动态</div>
+        </div>
+      </div>
+    </el-card>
 
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading-state">
-      <el-skeleton :rows="3" animated />
-    </div>
+    <el-card v-if="loading" class="loading-state-card">
+      <div class="loading-state">
+        <el-skeleton :rows="5" animated />
+      </div>
+    </el-card>
 
     <!-- 趋势图表对话框 -->
     <el-dialog
@@ -552,19 +571,37 @@ const closeChartDialog = () => {
 
 <style scoped>
 .new-highs-container {
-  padding: 20px;
-  background-color: #f5f7fa;
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
   min-height: 100vh;
 }
 
 .query-panel {
-  margin-bottom: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .query-form {
   display: flex;
+  flex-direction: column;
   gap: 20px;
+}
+
+.form-row {
+  display: flex;
+  gap: 24px;
   flex-wrap: wrap;
   align-items: flex-end;
 }
@@ -573,16 +610,19 @@ const closeChartDialog = () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-width: 240px;
 }
 
 .form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #303133;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  letter-spacing: 0.3px;
 }
 
 .date-picker {
-  width: 280px;
+  width: 100%;
 }
 
 .quick-select {
@@ -590,57 +630,105 @@ const closeChartDialog = () => {
   gap: 8px;
 }
 
+.form-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #e4e7ed;
+}
+
 .results-panel {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .results-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .concept-item {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
+  border: 2px solid #ebeef5;
+  border-radius: 12px;
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white;
 }
 
 .concept-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.concept-item.rank-top {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fff 0%, #fffbf0 100%);
 }
 
 .concept-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background-color: #f5f7fa;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .concept-header:hover {
-  background-color: #eef2f8;
+  background: linear-gradient(135deg, #eef2f8 0%, #f5f7fa 100%);
+}
+
+.rank-medal {
+  font-size: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.rank-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #909399;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  border-radius: 8px;
+  border: 2px solid #e4e7ed;
+}
+
+.concept-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .concept-title {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
 }
 
 .expand-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   transition: transform 0.3s ease;
   color: #909399;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: bold;
 }
 
@@ -649,39 +737,38 @@ const closeChartDialog = () => {
 }
 
 .concept-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: #303133;
+  letter-spacing: 0.5px;
 }
 
 .new-high-tag {
-  margin-left: 8px;
+  margin-left: auto;
 }
 
 .concept-stats {
   display: flex;
-  gap: 20px;
-  font-size: 14px;
-  color: #606266;
+  gap: 24px;
+  align-items: center;
 }
 
-.stat {
+.stat-item {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
 }
 
-.stat strong {
-  color: #303133;
-  font-weight: 600;
+.stat-label {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
 }
 
-.rank-badge {
-  background-color: #e6f7ff;
-  color: #0050b3;
-  padding: 2px 8px;
-  border-radius: 2px;
-  font-size: 13px;
+.stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #409eff;
 }
 
 .stocks-container {
@@ -800,16 +887,69 @@ const closeChartDialog = () => {
   padding: 0 !important;
 }
 
+.empty-state-card,
+.loading-state-card {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
 .empty-state {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  padding: 40px 20px;
-  min-height: 300px;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.empty-desc {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 32px;
+}
+
+.empty-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tip-item {
+  font-size: 13px;
+  color: #909399;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  border-radius: 8px;
+  border-left: 3px solid #409eff;
 }
 
 .loading-state {
-  padding: 20px;
+  padding: 30px 20px;
 }
 
 .form-btn-group {
@@ -915,59 +1055,79 @@ const closeChartDialog = () => {
 /* 移动端响应式 */
 @media (max-width: 768px) {
   .new-highs-container {
-    padding: 8px;
+    padding: 12px;
   }
 
-  .query-panel {
+  .query-panel,
+  .results-panel {
     margin-bottom: 16px;
+    border-radius: 8px;
   }
 
-  .query-form {
+  .header-title {
+    font-size: 14px;
+  }
+
+  .form-row {
     flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+    gap: 16px;
   }
 
   .form-group {
     width: 100%;
+    min-width: unset;
   }
 
   .form-group label {
-    font-size: 13px;
-  }
-
-  .date-picker {
-    width: 100%;
+    font-size: 12px;
   }
 
   .quick-select {
     width: 100%;
-    flex-wrap: wrap;
   }
 
   .quick-select .el-button {
     flex: 1;
-    min-width: calc(33.333% - 6px);
   }
 
-  .form-btn-group {
+  .form-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-actions .el-button {
     width: 100%;
   }
 
-  .form-btn-group .el-button {
-    flex: 1;
-    min-width: 100px;
+  .results-list {
+    gap: 12px;
+  }
+
+  .concept-item {
+    border-radius: 8px;
   }
 
   .concept-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    flex-direction: row;
     padding: 12px;
+    gap: 12px;
   }
 
-  .concept-title {
-    width: 100%;
+  .rank-medal {
+    font-size: 24px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .rank-number {
+    font-size: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+  }
+
+  .concept-content {
+    gap: 8px;
   }
 
   .concept-name {
@@ -975,14 +1135,16 @@ const closeChartDialog = () => {
   }
 
   .concept-stats {
-    width: 100%;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 13px;
+    flex-direction: row;
+    gap: 16px;
   }
 
-  .stat {
-    gap: 2px;
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 14px;
   }
 
   .trend-chart-btn-wrapper {
@@ -1034,6 +1196,34 @@ const closeChartDialog = () => {
 
   .card-header {
     font-size: 14px;
+  }
+
+  .empty-state {
+    padding: 40px 16px;
+  }
+
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .empty-title {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .empty-desc {
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .empty-tips {
+    width: 100%;
+  }
+
+  .tip-item {
+    font-size: 12px;
+    padding: 6px 12px;
   }
 }
 </style>

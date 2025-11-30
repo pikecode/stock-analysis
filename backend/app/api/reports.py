@@ -34,6 +34,7 @@ class ConceptNewHigh(BaseModel):
 async def get_concept_new_highs(
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
     end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    metric_code: str = Query("EEE", description="Metric code to filter"),
     db: Session = Depends(get_db),
 ):
     """
@@ -82,6 +83,7 @@ async def get_concept_new_highs(
             .filter(
                 and_(
                     ConceptDailySummary.concept_id == concept.id,
+                    ConceptDailySummary.metric_code == metric_code,
                     ConceptDailySummary.trade_date >= start,
                     ConceptDailySummary.trade_date <= end,
                 )
@@ -97,10 +99,9 @@ async def get_concept_new_highs(
         # Get the last day's summary
         last_day_summary = summaries[-1]
 
-        # Verify that the last day is exactly end_date
-        # If end_date has no data, skip this concept
-        if last_day_summary.trade_date != end:
-            continue
+        # Note: We use the actual last day from data, not necessarily end_date
+        # This allows querying even when end_date doesn't have data yet
+        actual_last_date = last_day_summary.trade_date
 
         last_day_value = last_day_summary.total_value or 0
 
@@ -122,7 +123,8 @@ async def get_concept_new_highs(
             .filter(
                 and_(
                     ConceptStockDailyRank.concept_id == concept.id,
-                    ConceptStockDailyRank.trade_date == end,
+                    ConceptStockDailyRank.metric_code == metric_code,
+                    ConceptStockDailyRank.trade_date == actual_last_date,
                 )
             )
             .order_by(ConceptStockDailyRank.trade_value.desc())
@@ -167,6 +169,7 @@ async def get_concept_trend(
     concept_id: int,
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
     end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    metric_code: str = Query("EEE", description="Metric code to filter"),
     db: Session = Depends(get_db),
 ):
     """
@@ -195,6 +198,7 @@ async def get_concept_trend(
         .filter(
             and_(
                 ConceptDailySummary.concept_id == concept_id,
+                ConceptDailySummary.metric_code == metric_code,
                 ConceptDailySummary.trade_date >= start,
                 ConceptDailySummary.trade_date <= end,
             )
@@ -211,14 +215,6 @@ async def get_concept_trend(
         }
         for summary in summaries
     ]
-
-
-class StockInNewHigh(BaseModel):
-    code: str
-    name: str
-    trade_value: float
-    price_change_pct: float
-    rank: int
 
 
 class ConvertibleBondNewHigh(BaseModel):
