@@ -32,53 +32,24 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 
--- plans 表（订阅套餐）
-CREATE TABLE IF NOT EXISTS plans (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    price NUMERIC(10, 2) NOT NULL DEFAULT 0,
-    original_price NUMERIC(10, 2),
-    duration_days INTEGER NOT NULL DEFAULT 30,
-    features TEXT,
-    is_active BOOLEAN DEFAULT true,
-    sort_order INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_plans_name ON plans(name);
-
 -- subscriptions 表（订阅信息）
 CREATE TABLE IF NOT EXISTS subscriptions (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan_id INTEGER REFERENCES plans(id) ON DELETE SET NULL,
-    start_date TIMESTAMP NOT NULL,
-    end_date TIMESTAMP NOT NULL,
-    amount_paid NUMERIC(10, 2) DEFAULT 0,
-    payment_method VARCHAR(50),
-    transaction_id VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'active',
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    notes TEXT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    plan_id INTEGER,
+    is_valid BOOLEAN DEFAULT true,
+    valid_until TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
-CREATE INDEX idx_subscriptions_end_date ON subscriptions(end_date);
-CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 
 -- subscription_logs 表（订阅日志）
 CREATE TABLE IF NOT EXISTS subscription_logs (
     id SERIAL PRIMARY KEY,
-    subscription_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    action VARCHAR(50) NOT NULL,
-    old_end_date TIMESTAMP,
-    new_end_date TIMESTAMP,
-    details TEXT,
-    performed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    subscription_id INTEGER NOT NULL REFERENCES subscriptions(id),
+    action VARCHAR(50),
+    valid_until TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

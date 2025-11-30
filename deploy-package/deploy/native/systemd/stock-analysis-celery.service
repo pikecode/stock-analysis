@@ -1,0 +1,27 @@
+[Unit]
+Description=Stock Analysis Celery Worker
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/stock-analysis/backend
+Environment="PATH=/opt/stock-analysis/backend/venv/bin"
+EnvironmentFile=/opt/stock-analysis/.env
+ExecStart=/opt/stock-analysis/backend/venv/bin/celery \
+    -A tasks worker \
+    --loglevel=info \
+    --concurrency=4
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/stock-analysis/celery.log
+StandardError=append:/var/log/stock-analysis/celery-error.log
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

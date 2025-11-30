@@ -107,29 +107,87 @@
 - 角色值为大写英文字符串（ADMIN, VIP, NORMAL）
 - 简化了旧的多对多角色关系，提高查询效率
 
-#### subscriptions（订阅表）
-用户订阅信息。
+#### plans（订阅套餐表）
+定义可供用户购买的订阅套餐。
 
 | 字段 | 类型 | 说明 | 约束 |
 |------|------|------|------|
 | id | INTEGER | 主键 | PK |
-| user_id | INTEGER | 用户ID | FK → users |
-| plan_id | INTEGER | 订阅计划ID | FK → plans |
-| is_valid | BOOLEAN | 是否有效 | 默认 true |
-| valid_until | TIMESTAMP | 有效期至 | - |
+| name | VARCHAR(100) | 套餐标识名 | UNIQUE, NOT NULL |
+| display_name | VARCHAR(100) | 显示名称 | NOT NULL |
+| description | TEXT | 套餐描述 | - |
+| price | NUMERIC(10,2) | 价格 | NOT NULL, 默认 0 |
+| original_price | NUMERIC(10,2) | 原价 | 用于显示折扣 |
+| duration_days | INTEGER | 有效天数 | NOT NULL, 默认 30 |
+| features | TEXT | 功能特性 | 逗号分隔的功能列表 |
+| is_active | BOOLEAN | 是否启用 | 默认 true |
+| sort_order | INTEGER | 显示排序 | 默认 0 |
 | created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
 | updated_at | TIMESTAMP | 更新时间 | 自动更新 |
 
-#### subscription_logs（订阅日志表）
-记录订阅变更历史。
+**索引**：name (UNIQUE)
+
+**示例套餐**：
+```
+trial - 免费试用（7天，¥0）
+monthly_vip - 月度VIP（30天，¥99）
+yearly_vip - 年度VIP（365天，¥899）
+```
+
+#### subscriptions（订阅表）
+用户订阅信息，记录用户购买的套餐及支付信息。
 
 | 字段 | 类型 | 说明 | 约束 |
 |------|------|------|------|
 | id | INTEGER | 主键 | PK |
-| subscription_id | INTEGER | 订阅ID | FK → subscriptions |
-| action | VARCHAR(50) | 操作类型 | created/updated/deleted |
-| valid_until | TIMESTAMP | 有效期 | - |
+| user_id | INTEGER | 用户ID | FK → users, NOT NULL |
+| plan_id | INTEGER | 订阅套餐ID | FK → plans |
+| start_date | TIMESTAMP | 订阅开始时间 | NOT NULL |
+| end_date | TIMESTAMP | 订阅结束时间 | NOT NULL |
+| amount_paid | NUMERIC(10,2) | 实付金额 | 默认 0 |
+| payment_method | VARCHAR(50) | 支付方式 | alipay/wechat/manual等 |
+| transaction_id | VARCHAR(100) | 交易流水号 | 外部支付系统ID |
+| status | VARCHAR(20) | 订阅状态 | active/expired/cancelled, 默认 active |
+| created_by | INTEGER | 创建人 | FK → users（管理员手动创建时） |
+| notes | TEXT | 备注 | 管理员备注信息 |
+| created_at | TIMESTAMP | 创建时间 | 默认当前时间 |
+| updated_at | TIMESTAMP | 更新时间 | 自动更新 |
+
+**索引**：user_id, end_date, status
+
+**计算属性**（Model层）：
+- `is_valid` - 根据 status='active' 且 end_date > now() 判断
+- `days_remaining` - end_date - now() 的天数
+
+**设计说明**：
+- 采用明确的时间段设计（start_date + end_date）替代旧的 is_valid + valid_until
+- 支持多种支付方式和交易追踪
+- status 字段显式管理订阅状态
+- created_by 支持管理员手动为用户创建订阅
+
+#### subscription_logs（订阅日志表）
+记录订阅变更历史，用于审计追踪。
+
+| 字段 | 类型 | 说明 | 约束 |
+|------|------|------|------|
+| id | INTEGER | 主键 | PK |
+| subscription_id | INTEGER | 订阅ID | FK → subscriptions, NOT NULL |
+| user_id | INTEGER | 关联用户ID | FK → users |
+| action | VARCHAR(50) | 操作类型 | NOT NULL, created/renewed/cancelled/expired/modified |
+| old_end_date | TIMESTAMP | 变更前结束时间 | - |
+| new_end_date | TIMESTAMP | 变更后结束时间 | - |
+| details | TEXT | 详细信息 | JSON格式的变更详情 |
+| performed_by | INTEGER | 操作人 | FK → users（管理员或系统） |
 | created_at | TIMESTAMP | 操作时间 | 默认当前时间 |
+
+**索引**：subscription_id
+
+**操作类型说明**：
+- `created` - 订阅创建
+- `renewed` - 续费
+- `cancelled` - 取消订阅
+- `expired` - 自动过期
+- `modified` - 管理员修改
 
 ---
 

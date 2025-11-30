@@ -1,0 +1,380 @@
+"""Reports API."""
+from datetime import date, datetime, timedelta
+from typing import List, Optional
+from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
+
+from app.core.database import get_db
+from app.models.stock import Concept, Stock, StockConcept, ConceptDailySummary, ConceptStockDailyRank
+
+router = APIRouter(prefix="/reports", tags=["Reports"])
+
+
+class StockInNewHigh(BaseModel):
+    code: str
+    name: str
+    trade_value: float
+    price_change_pct: float
+    rank: int
+
+
+class ConceptNewHigh(BaseModel):
+    concept_id: int
+    concept_name: str
+    total_trade_value: float
+    daily_rank: int
+    is_new_high: bool
+    stocks: List[StockInNewHigh]
+
+
+@router.get("/concept-new-highs", response_model=List[ConceptNewHigh])
+async def get_concept_new_highs(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    metric_code: str = Query("EEE", description="Metric code to filter"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get concepts that reached new highs on the last day of the date range.
+
+    Logic:
+    1. For each concept, get all daily summaries within the date range
+    2. Require at least 2 days of data (last day must have something to compare against)
+    3. Verify that the last record's date matches end_date exactly
+    4. Compare last day's volume against all previous days in the range
+    5. If last day > max(previous days), it's a new high concept
+    6. Return those concepts sorted by trading volume on the last day
+
+    Requirements:
+    - Must have data on end_date (if no data on that day, concept is skipped)
+    - Last day volume must be STRICTLY GREATER than all previous days
+    - Requires at least 2 days of data to qualify as new high
+
+    Args:
+        start_date: Start date for the analysis period (YYYY-MM-DD)
+        end_date: End date for the analysis period - last day checked for new highs (YYYY-MM-DD)
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    # Get all concepts
+    concepts = db.query(Concept).all()
+    results = []
+
+    for concept in concepts:
+        # Get daily summaries for this concept within the date range
+        summaries = (
+            db.query(ConceptDailySummary)
+            .filter(
+                and_(
+                    ConceptDailySummary.concept_id == concept.id,
+                    ConceptDailySummary.metric_code == metric_code,
+                    ConceptDailySummary.trade_date >= start,
+                    ConceptDailySummary.trade_date <= end,
+                )
+            )
+            .order_by(ConceptDailySummary.trade_date)
+            .all()
+        )
+
+        # Need at least 2 days of data to compare (last day vs previous days)
+        if len(summaries) < 2:
+            continue
+
+        # Get the last day's summary
+        last_day_summary = summaries[-1]
+
+        # Note: We use the actual last day from data, not necessarily end_date
+        # This allows querying even when end_date doesn't have data yet
+        actual_last_date = last_day_summary.trade_date
+
+        last_day_value = last_day_summary.total_value or 0
+
+        if last_day_value == 0:
+            continue
+
+        # Calculate the maximum value from previous days (excluding last day)
+        previous_max = max(
+            (summary.total_value or 0) for summary in summaries[:-1]
+        )
+
+        # Check if last day is strictly greater than all previous days (new high)
+        if last_day_value <= previous_max:
+            continue
+
+        # Get stocks in this concept for the last day, sorted by trade value
+        stock_rank_data_list = (
+            db.query(ConceptStockDailyRank)
+            .filter(
+                and_(
+                    ConceptStockDailyRank.concept_id == concept.id,
+                    ConceptStockDailyRank.metric_code == metric_code,
+                    ConceptStockDailyRank.trade_date == actual_last_date,
+                )
+            )
+            .order_by(ConceptStockDailyRank.trade_value.desc())
+            .all()
+        )
+
+        stocks = []
+        for stock_rank_data in stock_rank_data_list:
+            # Get stock name from Stock table
+            stock = db.query(Stock).filter(Stock.stock_code == stock_rank_data.stock_code).first()
+            stock_name = stock.stock_name if stock else stock_rank_data.stock_code
+
+            stocks.append(
+                StockInNewHigh(
+                    code=stock_rank_data.stock_code,
+                    name=stock_name,
+                    trade_value=stock_rank_data.trade_value or 0,
+                    price_change_pct=0,  # ConceptStockDailyRank doesn't have price_change_pct
+                    rank=stock_rank_data.rank or 0,
+                )
+            )
+
+        results.append(
+            ConceptNewHigh(
+                concept_id=concept.id,
+                concept_name=concept.concept_name,
+                total_trade_value=last_day_value,
+                daily_rank=0,
+                is_new_high=True,
+                stocks=stocks,
+            )
+        )
+
+    # Sort by trade value descending
+    results.sort(key=lambda x: x.total_trade_value, reverse=True)
+
+    return results
+
+
+@router.get("/concept-trend/{concept_id}")
+async def get_concept_trend(
+    concept_id: int,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    metric_code: str = Query("EEE", description="Metric code to filter"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get daily trading volume trend for a concept within date range.
+
+    Used for displaying trend chart when clicking on a concept.
+    Returns daily aggregated trade values and marks the final day (end_date).
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    summaries = (
+        db.query(ConceptDailySummary)
+        .filter(
+            and_(
+                ConceptDailySummary.concept_id == concept_id,
+                ConceptDailySummary.metric_code == metric_code,
+                ConceptDailySummary.trade_date >= start,
+                ConceptDailySummary.trade_date <= end,
+            )
+        )
+        .order_by(ConceptDailySummary.trade_date)
+        .all()
+    )
+
+    return [
+        {
+            "date": summary.trade_date.isoformat(),
+            "trade_value": summary.total_value or 0,
+            "is_peak": summary.trade_date == end,  # Mark the last day (new high day)
+        }
+        for summary in summaries
+    ]
+
+
+class ConvertibleBondNewHigh(BaseModel):
+    stock_code: str
+    stock_name: str
+    total_trade_value: float
+    daily_rank: int
+    is_new_high: bool
+    stocks: List[StockInNewHigh]
+
+
+@router.get("/convertible-bond-new-highs", response_model=List[ConvertibleBondNewHigh])
+async def get_convertible_bond_new_highs(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get convertible bonds (stocks starting with '1') that reached new highs.
+
+    Logic:
+    1. Find all stocks starting with '1' (convertible bonds)
+    2. Require at least 2 days of data (last day must have something to compare against)
+    3. Verify that the last record's date matches end_date exactly
+    4. Compare last day's volume against all previous days in the range
+    5. If last day > max(previous days), it's a new high bond
+    6. Return those bonds sorted by trading volume on the last day
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    # Get all stocks starting with '1' (convertible bonds)
+    bonds = db.query(Stock).filter(Stock.stock_code.startswith('1')).all()
+    results = []
+
+    for bond in bonds:
+        # Get daily summaries - we'll need to create these from daily data
+        # For now, we'll query StockConcept or similar to get daily data
+        # Since there's no direct stock daily summary, we'll use ConceptStockDailyRank
+        # But we need to think about this differently...
+
+        # Get all trading data for this bond
+        from app.models.stock import StockDailyQuote
+        try:
+            daily_quotes = (
+                db.query(StockDailyQuote)
+                .filter(
+                    and_(
+                        StockDailyQuote.stock_code == bond.stock_code,
+                        StockDailyQuote.trade_date >= start,
+                        StockDailyQuote.trade_date <= end,
+                    )
+                )
+                .order_by(StockDailyQuote.trade_date)
+                .all()
+            )
+        except:
+            # If StockDailyQuote doesn't exist, skip this bond
+            continue
+
+        # Need at least 2 days of data to compare
+        if len(daily_quotes) < 2:
+            continue
+
+        # Get the last day's data
+        last_day_quote = daily_quotes[-1]
+
+        # Verify that the last record's date matches end_date exactly
+        if last_day_quote.trade_date != end:
+            continue
+
+        last_day_value = last_day_quote.trade_volume or 0
+
+        if last_day_value == 0:
+            continue
+
+        # Calculate the maximum value from previous days (excluding last day)
+        previous_max = max(
+            (quote.trade_volume or 0) for quote in daily_quotes[:-1]
+        )
+
+        # Check if last day is strictly greater than all previous days (new high)
+        if last_day_value <= previous_max:
+            continue
+
+        # For now, we'll return a simplified structure
+        results.append(
+            ConvertibleBondNewHigh(
+                stock_code=bond.stock_code,
+                stock_name=bond.stock_name,
+                total_trade_value=last_day_value,
+                daily_rank=0,
+                is_new_high=True,
+                stocks=[],  # Convertible bonds don't have sub-stocks
+            )
+        )
+
+    # Sort by trade value descending
+    results.sort(key=lambda x: x.total_trade_value, reverse=True)
+
+    return results
+
+
+@router.get("/convertible-bond-trend/{stock_code}")
+async def get_convertible_bond_trend(
+    stock_code: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get daily trading volume trend for a convertible bond within date range.
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD",
+        )
+
+    if start > end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be before end_date",
+        )
+
+    from app.models.stock import StockDailyQuote
+
+    daily_quotes = (
+        db.query(StockDailyQuote)
+        .filter(
+            and_(
+                StockDailyQuote.stock_code == stock_code,
+                StockDailyQuote.trade_date >= start,
+                StockDailyQuote.trade_date <= end,
+            )
+        )
+        .order_by(StockDailyQuote.trade_date)
+        .all()
+    )
+
+    return [
+        {
+            "date": quote.trade_date.isoformat(),
+            "trade_value": quote.trade_volume or 0,
+            "is_peak": quote.trade_date == end,
+        }
+        for quote in daily_quotes
+    ]

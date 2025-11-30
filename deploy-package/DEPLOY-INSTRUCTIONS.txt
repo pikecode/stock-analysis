@@ -1,0 +1,51 @@
+========================================
+股票分析系统部署包
+========================================
+
+本部署包包含：
+1. backend/      - 后端代码 (FastAPI)
+2. frontend/     - 前端代码 (Vue 3)
+3. deploy/       - 部署脚本和文档
+
+部署步骤：
+----------------------------------------
+
+1. 上传部署包到服务器
+   scp stock-analysis-deploy-*.tar.gz ubuntu@your-server:/tmp/
+
+2. 解压部署包
+   cd /tmp
+   tar -xzf stock-analysis-deploy-*.tar.gz
+   cd stock-analysis-deploy-*
+
+3. 执行部署脚本
+   cd deploy/scripts
+   chmod +x *.sh
+   ./00-deploy-all.sh
+
+4. 部署后配置
+   - 修改数据库密码
+   - 创建管理员账户
+   - 配置域名和SSL
+
+详细说明：
+----------------------------------------
+请查看 deploy/docs/DEPLOYMENT.md
+
+服务管理：
+----------------------------------------
+# 后端服务
+sudo systemctl status stock-analysis-backend
+sudo systemctl restart stock-analysis-backend
+
+# Nginx
+sudo systemctl status nginx
+sudo systemctl restart nginx
+
+访问地址：
+----------------------------------------
+- 前端: http://服务器IP
+- API文档: http://服务器IP/api/docs
+- 管理后台: http://服务器IP/admin
+
+========================================

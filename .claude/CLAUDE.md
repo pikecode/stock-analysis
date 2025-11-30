@@ -44,6 +44,103 @@ redis-server
 celery -A tasks.celery_app worker --loglevel=info
 ```
 
+## Production Deployment
+
+### 🚀 When User Says: "部署生产环境" or "更新代码到服务器"
+
+Execute the following automated deployment process:
+
+#### Quick Update (Most Common)
+```bash
+cd deploy/scripts
+./update-production.sh
+```
+
+This script automatically:
+- ✅ Backs up database and current code
+- ✅ Uploads latest code to server
+- ✅ Updates Python/Node dependencies
+- ✅ Rebuilds frontend
+- ✅ Restarts all services
+- ✅ Verifies deployment success
+
+**Estimated time:** 2-3 minutes
+
+#### Partial Updates
+```bash
+# Backend only (30-60 seconds)
+./update-backend.sh
+
+# Frontend only (30-60 seconds)
+./update-frontend.sh
+```
+
+### Production Environment Info
+- **URL:** https://qwquant.com
+- **API Docs:** https://qwquant.com/api/docs
+- **Server:** 82.157.28.35 (Ubuntu 20.04)
+- **User:** ubuntu
+- **Password:** chen_188_8_8
+- **Project Path:** /var/www/stock-analysis
+- **Database:** stock_analysis (PostgreSQL)
+
+### Deployment Triggers
+Recognize these user phrases and execute deployment:
+- "部署生产环境" / "部署到生产环境"
+- "更新代码到服务器" / "更新生产环境"
+- "执行生产部署" / "发布到线上"
+- "deploy to production" / "update production"
+
+### Critical: Python 3.8 Compatibility
+Server runs Python 3.8. Update scripts automatically fix type annotations:
+```python
+# ❌ Won't work on Python 3.8
+def get_items() -> list[Item]: pass
+
+# ✅ Auto-converted to
+from __future__ import annotations
+from typing import List
+def get_items() -> List[Item]: pass
+```
+
+### Quick Rollback (If Issues Occur)
+```bash
+ssh ubuntu@82.157.28.35
+cd /var/www/stock-analysis
+
+# Rollback backend
+sudo systemctl stop stock-analysis-backend
+rm -rf backend && mv backend.backup backend
+sudo systemctl start stock-analysis-backend
+
+# Rollback frontend
+cd frontend
+rm -rf dist && mv dist.backup dist
+sudo systemctl reload nginx
+```
+
+### Deployment Documentation
+- **Quick Reference:** `deploy/QUICK-START.md` ⭐ Most useful
+- **Complete Guide:** `deploy/docs/DEPLOYMENT.md`
+- **Update Guide:** `deploy/docs/UPDATE-GUIDE.md`
+- **Deployment History:** `deploy/docs/DEPLOYMENT-SUMMARY.md`
+
+### Service Management Commands
+```bash
+# Check status
+ssh ubuntu@82.157.28.35
+sudo systemctl status stock-analysis-backend
+sudo systemctl status nginx
+
+# View logs
+sudo journalctl -u stock-analysis-backend -f
+sudo tail -f /var/log/nginx/qwquant_error.log
+
+# Restart services
+sudo systemctl restart stock-analysis-backend
+sudo systemctl reload nginx
+```
+
 ## Project Architecture
 
 ### Frontend: Three-Tier Routing System
