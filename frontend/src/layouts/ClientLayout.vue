@@ -41,7 +41,6 @@ const activeMenu = computed(() => {
   const path = route.path
   // 精确匹配菜单项
   if (path === '/reports') return '/reports'
-  if (path === '/reports/concept-ranking') return '/reports/concept-ranking'
   if (path === '/reports/new-highs') return '/reports/new-highs'
   if (path === '/convertible-bonds') return '/convertible-bonds'
   if (path === '/profile' || path.startsWith('/profile/')) return '/profile'
@@ -120,12 +119,6 @@ const sidebarWidth = computed(() => {
           <span>报表总览</span>
         </el-menu-item>
 
-        <!-- 概念排名 -->
-        <el-menu-item index="/reports/concept-ranking">
-          <el-icon><TrendCharts /></el-icon>
-          <span>概念排名</span>
-        </el-menu-item>
-
         <!-- 创新高分析 -->
         <el-menu-item index="/reports/new-highs">
           <el-icon><DataAnalysis /></el-icon>
@@ -177,12 +170,6 @@ const sidebarWidth = computed(() => {
         <el-menu-item index="/reports">
           <el-icon><DataAnalysis /></el-icon>
           <span>报表总览</span>
-        </el-menu-item>
-
-        <!-- 概念排名 -->
-        <el-menu-item index="/reports/concept-ranking">
-          <el-icon><TrendCharts /></el-icon>
-          <span>概念排名</span>
         </el-menu-item>
 
         <!-- 创新高分析 -->

@@ -16,25 +16,12 @@ def process_csv_import(self, batch_id: int, file_path: str):
     try:
         import_service = ImportService(db)
 
-        # Update status
-        import_service.update_batch_status(batch_id, "processing")
-
         # Read file
         with open(file_path, "rb") as f:
             file_content = f.read()
 
-        # Parse and import using optimized service
-        csv_service = OptimizedCSVImportService(db)
-        success_count, error_count = csv_service.parse_and_import_optimized(batch_id, file_content)
-
-        # Update status
-        import_service.update_batch_status(
-            batch_id,
-            "completed",
-            total_rows=success_count + error_count,
-            success_rows=success_count,
-            error_rows=error_count,
-        )
+        # 调用统一导入方法
+        success_count, error_count = import_service.import_csv_file(batch_id, file_content)
 
         # Clean up file
         if os.path.exists(file_path):
@@ -68,37 +55,16 @@ def process_txt_import(
     try:
         import_service = ImportService(db)
 
-        # Update status
-        import_service.update_batch_status(batch_id, "processing")
-
-        # Get metric type
-        metric_type = import_service.get_metric_type_by_id(metric_type_id)
-        if not metric_type:
-            raise ValueError(f"Metric type {metric_type_id} not found")
-
         # Parse data date
         data_date = date.fromisoformat(data_date_str)
-
-        # Delete old data for the same metric type and date
-        import_service.delete_old_metric_data(metric_type_id, data_date, batch_id)
 
         # Read file
         with open(file_path, "rb") as f:
             file_content = f.read()
 
-        # Parse and import using optimized service (includes computation)
-        txt_service = OptimizedTXTImportService(db)
-        success_count, error_count = txt_service.parse_and_import_with_compute(
-            batch_id, file_content, metric_type_id, metric_type.code, data_date
-        )
-
-        # Update status
-        import_service.update_batch_status(
-            batch_id,
-            "completed",
-            total_rows=success_count + error_count,
-            success_rows=success_count,
-            error_rows=error_count,
+        # 调用统一导入方法
+        success_count, error_count = import_service.import_txt_file(
+            batch_id, file_content, metric_type_id, data_date
         )
 
         # Clean up file

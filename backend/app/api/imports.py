@@ -118,33 +118,12 @@ async def upload_file(
     if file_size < 1024 * 1024:  # 1MB
         # Process synchronously
         try:
+            # 调用统一导入方法
             if file_type == "CSV":
-                import_service.update_batch_status(batch.id, "processing")
-                csv_service = OptimizedCSVImportService(db)
-                success, errors = csv_service.parse_and_import_optimized(batch.id, file_content)
-                import_service.update_batch_status(
-                    batch.id, "completed",
-                    total_rows=success + errors,
-                    success_rows=success,
-                    error_rows=errors,
-                )
+                success, errors = import_service.import_csv_file(batch.id, file_content)
             else:
-                import_service.update_batch_status(batch.id, "processing")
-                metric_type = import_service.get_metric_type_by_id(metric_type_id)
-
-                # Delete old data for the same metric type and date
-                import_service.delete_old_metric_data(metric_type_id, parsed_date, batch.id)
-
-                # Use optimized TXT import service (includes computation)
-                txt_service = OptimizedTXTImportService(db)
-                success, errors = txt_service.parse_and_import_with_compute(
-                    batch.id, file_content, metric_type_id, metric_type.code, parsed_date
-                )
-                import_service.update_batch_status(
-                    batch.id, "completed",
-                    total_rows=success + errors,
-                    success_rows=success,
-                    error_rows=errors,
+                success, errors = import_service.import_txt_file(
+                    batch.id, file_content, metric_type_id, parsed_date
                 )
 
             # Clean up file

@@ -263,24 +263,18 @@ class BatchImporter:
             db.add(import_batch)
             db.commit()
 
-            # 执行导入
-            service = OptimizedTXTImportService(db)
-            success_count, error_count = service.parse_and_import_with_compute(
+            # 调用统一导入方法
+            from app.services.import_service import ImportService
+            import_service = ImportService(db)
+            success_count, error_count = import_service.import_txt_file(
                 batch_id=import_batch.id,
                 file_content=file_content,
                 metric_type_id=metric_type_id,
-                metric_code=metric_code,
                 data_date=trade_date
             )
 
-            # 更新批次状态
-            import_batch.status = 'completed'
-            import_batch.success_rows = success_count
-            import_batch.error_rows = error_count
-            import_batch.total_rows = success_count + error_count
-            import_batch.completed_at = datetime.now()
-            db.commit()
-
+            # 状态已在import_txt_file中更新，这里只需刷新
+            db.refresh(import_batch)
             db.close()
 
             return trade_date_str, True, f"成功: {success_count}条"

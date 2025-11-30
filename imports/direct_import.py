@@ -95,18 +95,10 @@ def main():
         if args.verbose:
             print(f"✓ 创建批次: {batch.id}")
 
-        # 导入数据
+        # 调用统一导入方法
         if args.type == "CSV":
             print("📥 导入CSV文件（股票-概念映射）...")
-            service = OptimizedCSVImportService(db)
-            success, errors = service.parse_and_import_optimized(batch.id, file_content)
-
-            import_service.update_batch_status(
-                batch.id, "completed",
-                total_rows=success + errors,
-                success_rows=success,
-                error_rows=errors
-            )
+            success, errors = import_service.import_csv_file(batch.id, file_content)
 
             print(f"✓ CSV导入完成")
             print(f"  - 成功: {success} 条")
@@ -114,17 +106,10 @@ def main():
 
         else:  # TXT
             print(f"📥 导入TXT文件（{args.metric_code}交易数据）...")
-            service = OptimizedTXTImportService(db)
-
-            # 删除旧数据
-            import_service.delete_old_metric_data(metric_type_id, parsed_date, batch.id)
-
-            # 导入数据和计算
-            success, errors = service.parse_and_import_with_compute(
+            success, errors = import_service.import_txt_file(
                 batch.id,
                 file_content,
                 metric_type_id,
-                metric_type.code,
                 parsed_date
             )
 

@@ -9,9 +9,10 @@ For actual CSV/TXT data parsing and importing, use:
 """
 import hashlib
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.models.stock import (
     ImportBatch,
@@ -228,3 +229,108 @@ class ImportService:
                 continue
 
         return None
+
+    def import_txt_file(
+        self,
+        batch_id: int,
+        file_content: bytes,
+        metric_type_id: int,
+        data_date: date
+    ) -> Tuple[int, int]:
+        """
+        统一的TXT文件导入方法（基于页面导入逻辑）
+
+        包含：
+        1. 数据库锁（防止并发导入同一指标+日期）
+        2. 删除旧数据
+        3. 导入原始数据和计算排名汇总
+        4. 更新batch状态
+
+        Args:
+            batch_id: 导入批次ID
+            file_content: 文件内容
+            metric_type_id: 指标类型ID
+            data_date: 数据日期
+
+        Returns:
+            (success_count, error_count)
+        """
+        # 获取metric_type
+        metric_type = self.get_metric_type_by_id(metric_type_id)
+        if not metric_type:
+            raise ValueError(f"Metric type {metric_type_id} not found")
+
+        # 🔒 添加数据库锁，防止并发导入同一指标
+        # 锁定metric_types表的当前行，同一指标的并发导入会串行化
+        self.db.execute(text("""
+            SELECT 1 FROM metric_types
+            WHERE id = :metric_type_id
+            FOR UPDATE
+        """), {"metric_type_id": metric_type_id})
+
+        # 更新状态为processing
+        self.update_batch_status(batch_id, "processing")
+
+        # 删除旧数据（相同指标+日期的其他batch数据）
+        self.delete_old_metric_data(metric_type_id, data_date, batch_id)
+
+        # 导入数据和计算排名汇总
+        from app.services.optimized_txt_import import OptimizedTXTImportService
+        txt_service = OptimizedTXTImportService(self.db)
+        success, errors = txt_service.parse_and_import_with_compute(
+            batch_id, file_content, metric_type_id, metric_type.code, data_date
+        )
+
+        # 更新状态为completed
+        self.update_batch_status(
+            batch_id, "completed",
+            total_rows=success + errors,
+            success_rows=success,
+            error_rows=errors,
+        )
+
+        return success, errors
+
+    def import_csv_file(
+        self,
+        batch_id: int,
+        file_content: bytes
+    ) -> Tuple[int, int]:
+        """
+        统一的CSV文件导入方法（基于页面导入逻辑）
+
+        包含：
+        1. 数据库锁（防止并发导入）
+        2. 导入股票-概念关系数据
+        3. 更新batch状态
+
+        Args:
+            batch_id: 导入批次ID
+            file_content: 文件内容
+
+        Returns:
+            (success_count, error_count)
+        """
+        # 🔒 添加数据库锁，防止并发CSV导入冲突
+        # 锁定concepts表，CSV导入会修改股票-概念关系
+        self.db.execute(text("""
+            SELECT 1 FROM concepts LIMIT 1 FOR UPDATE
+        """))
+
+        # 更新状态为processing
+        self.update_batch_status(batch_id, "processing")
+
+        # 导入股票-概念关系数据
+        from app.services.optimized_csv_import import OptimizedCSVImportService
+        csv_service = OptimizedCSVImportService(self.db)
+        success, errors = csv_service.parse_and_import_optimized(batch_id, file_content)
+
+        # 更新状态为completed
+        self.update_batch_status(
+            batch_id, "completed",
+            total_rows=success + errors,
+            success_rows=success,
+            error_rows=errors,
+        )
+
+        return success, errors
