@@ -1,6 +1,8 @@
 """Application configuration."""
+from __future__ import annotations
+
 from functools import lru_cache
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
@@ -45,7 +47,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
     @property
-    def CORS_ORIGINS(self) -> list[str]:
+    def CORS_ORIGINS(self) -> List[str]:
         """Get CORS origins as a list."""
         origins = getattr(self, '_cors_origins_str', "http://localhost:3000,http://localhost:5173")
         # If it comes from env with name CORS_ORIGINS, try to parse it

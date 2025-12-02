@@ -1,7 +1,9 @@
 """Import API."""
+from __future__ import annotations
+
 import os
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
@@ -163,7 +165,7 @@ async def upload_file(
         )
 
 
-@router.get("/batches", response_model=list[ImportBatchResponse])
+@router.get("/batches", response_model=List[ImportBatchResponse])
 async def list_batches(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),

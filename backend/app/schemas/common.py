@@ -1,5 +1,7 @@
 """Common schemas."""
-from typing import Any, Generic, Optional, TypeVar
+from __future__ import annotations
+
+from typing import Any, Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel
 
@@ -35,4 +37,4 @@ class PaginatedResponse(BaseModel, Generic[T]):
     total: int
     page: int
     page_size: int
-    items: list[T]
+    items: List[T]

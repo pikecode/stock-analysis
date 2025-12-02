@@ -1,7 +1,7 @@
 """Stock and concept schemas."""
 from __future__ import annotations
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -60,20 +60,20 @@ class StockListResponse(BaseModel):
     """Stock list response."""
 
     total: int
-    items: list[StockWithConcepts]
+    items: List[StockWithConcepts]
 
 
 class StockWithConcepts(StockResponse):
     """Stock with concepts."""
 
-    concepts: list[ConceptBrief] = []
+    concepts: List[ConceptBrief] = []
 
 
 class ConceptListResponse(BaseModel):
     """Concept list response."""
 
     total: int
-    items: list[ConceptResponse]
+    items: List[ConceptResponse]
 
 
 # Ranking schemas
@@ -93,7 +93,7 @@ class ConceptRankingResponse(BaseModel):
     concept_name: str
     trade_date: date
     metric_code: str
-    rankings: list[RankingItem]
+    rankings: List[RankingItem]
 
 
 class StockRankingHistory(BaseModel):
@@ -112,7 +112,7 @@ class StockRankingHistoryResponse(BaseModel):
     concept_id: int
     concept_name: str
     metric_code: str
-    history: list[StockRankingHistory]
+    history: List[StockRankingHistory]
 
 
 class TopNCountItem(BaseModel):
@@ -133,7 +133,7 @@ class TopNCountResponse(BaseModel):
     top_n: int
     metric_code: str
     trading_days: int
-    statistics: list[TopNCountItem]
+    statistics: List[TopNCountItem]
 
 
 # Summary schemas
@@ -155,7 +155,7 @@ class ConceptSummaryResponse(BaseModel):
     concept_id: int
     concept_name: str
     metric_code: str
-    summaries: list[DailySummaryItem]
+    summaries: List[DailySummaryItem]
 
 
 # Metric schemas
@@ -226,7 +226,7 @@ class StockConceptsRankedResponse(BaseModel):
     trade_date: date
     metric_code: str
     total_concepts: int
-    concepts: list[ConceptRankedItem]
+    concepts: List[ConceptRankedItem]
 
 
 # Concept stocks in date range schemas
@@ -249,4 +249,4 @@ class ConceptStocksRankingRangeResponse(BaseModel):
     start_date: date
     end_date: date
     query_date: Optional[date] = None  # 实际查询的日期（如果使用latest_date）
-    stocks: list[StockRankingInRangeItem]
+    stocks: List[StockRankingInRangeItem]
